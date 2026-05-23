@@ -628,8 +628,9 @@
   // ===== 칼로리 (MET) =====
   function calcTargetRounds(weightKg) {
     var w = weightKg || 70;
+    var kcalGoal = w * 5;
     var kcalPerRound = (8.0 * w * workSeconds + 3.5 * w * restSeconds) / 3600;
-    return Math.max(10, Math.min(99, Math.round(250 / kcalPerRound)));
+    return Math.max(10, Math.min(99, Math.round(kcalGoal / kcalPerRound)));
   }
 
   function calcKcal(workSec, restSec, weightKg) {
