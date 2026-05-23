@@ -410,12 +410,11 @@
       </div>
     </div>
     <div class="setting-row">
-      <div class="setting-label">라운드</div>
-      <div class="setting-controls">
-        <button type="button" class="setting-btn" id="roundsMinus">−</button>
-        <div class="setting-value"><span id="roundsVal">50</span>회</div>
-        <button type="button" class="setting-btn" id="roundsPlus">+</button>
+      <div>
+        <div class="setting-label">목표 라운드</div>
+        <div style="font-size:12px; opacity:0.6; margin-top:2px;" id="roundsWeightLabel">체중 탭에서 몸무게를 입력하세요</div>
       </div>
+      <div class="setting-value"><span id="roundsVal">--</span>회</div>
     </div>
   </div>
 
@@ -625,6 +624,12 @@
   }
   
   // ===== 칼로리 (MET) =====
+  function calcTargetRounds(weightKg) {
+    var w = weightKg || 70;
+    var kcalPerRound = (8.0 * w * workSeconds + 3.5 * w * restSeconds) / 3600;
+    return Math.max(10, Math.min(99, Math.round(250 / kcalPerRound)));
+  }
+
   function calcKcal(workSec, restSec, weightKg) {
     var w = weightKg || 70;
     var workKcal = 8.0 * w * (workSec / 3600);
@@ -682,7 +687,9 @@
     document.getElementById('timer').textContent = secondsRemaining;
     document.getElementById('workVal').textContent = workSeconds;
     document.getElementById('restVal').textContent = restSeconds;
-    document.getElementById('roundsVal').textContent = totalRounds;
+    document.getElementById('roundsVal').textContent = totalRounds || '--';
+    var lbl = document.getElementById('roundsWeightLabel');
+    if (lbl) lbl.textContent = lastWeight ? lastWeight + 'kg 기준 · 목표 소모 약 250kcal' : '체중 탭에서 몸무게를 입력하세요';
     
     var labels = { ready: '준비', countdown: '시작 준비!', work: '운동!', rest: '휴식', finished: '완료!' };
     document.getElementById('phaseLabel').textContent = labels[phase] || '';
@@ -711,9 +718,8 @@
       if (phase === 'ready') secondsRemaining = workSeconds;
     } else if (type === 'rest') {
       restSeconds = Math.max(5, Math.min(60, restSeconds + delta));
-    } else if (type === 'rounds') {
-      totalRounds = Math.max(1, Math.min(99, totalRounds + delta));
     }
+    totalRounds = calcTargetRounds(lastWeight);
     render();
   }
   
@@ -951,7 +957,8 @@
     saveWeights(weights);
     saveLastWeight(w);
     lastWeight = w;
-    
+    totalRounds = calcTargetRounds(w);
+
     input.value = '';
     renderWeightPage();
     alert('오늘 체중 ' + w + 'kg이 저장되었습니다!');
@@ -997,16 +1004,11 @@
     var currentW = weights[todayStr] || (dates.length > 0 ? weights[dates[dates.length - 1]] : null);
     var goalCard = document.getElementById('calorieGoalCard');
     if (currentW) {
-      var goal = Math.round(currentW * 5 / 10) * 10;
+      var targetRds = calcTargetRounds(currentW);
+      var goal = calcKcal(workSeconds * targetRds, restSeconds * Math.max(0, targetRds - 1), currentW);
       document.getElementById('calorieGoalValue').textContent = goal;
-      var kcalPerSession = calcKcal(workSeconds * totalRounds, restSeconds * (totalRounds - 1), currentW);
-      var sessionsNeeded = goal / kcalPerSession;
-      var sessionsText = sessionsNeeded <= 1.2 ? '타바타 1세션' :
-                         sessionsNeeded <= 1.8 ? '타바타 1~2세션' :
-                         sessionsNeeded <= 2.5 ? '타바타 약 2세션' :
-                         '타바타 약 ' + Math.round(sessionsNeeded) + '세션';
       document.getElementById('calorieGoalSub').textContent =
-        currentW.toFixed(1) + 'kg 기준 · ' + sessionsText + '으로 달성 가능';
+        currentW.toFixed(1) + 'kg 기준 · 목표 ' + targetRds + '라운드 완료 시 소모량';
       goalCard.style.display = '';
     } else {
       goalCard.style.display = 'none';
@@ -1271,8 +1273,6 @@
   bind('workPlus', function() { adjustSetting('work', 5); });
   bind('restMinus', function() { adjustSetting('rest', -5); });
   bind('restPlus', function() { adjustSetting('rest', 5); });
-  bind('roundsMinus', function() { adjustSetting('rounds', -1); });
-  bind('roundsPlus', function() { adjustSetting('rounds', 1); });
   
   bind('tabTimer', function() { switchTab('timer'); });
   bind('tabHistory', function() { switchTab('history'); });
@@ -1308,10 +1308,11 @@
   
   // 초기화
   lastWeight = loadLastWeight();
+  totalRounds = calcTargetRounds(lastWeight);
   var now = new Date();
   calYear = now.getFullYear();
   calMonth = now.getMonth();
-  
+
   render();
 })();
 </script>
