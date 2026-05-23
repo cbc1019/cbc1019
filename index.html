@@ -421,6 +421,7 @@
   <div class="controls">
     <button type="button" class="control-btn primary" id="playBtn">▶</button>
     <button type="button" class="control-btn" id="resetBtn">↻</button>
+    <button type="button" class="control-btn" id="stopBtn" style="display:none; background:rgba(220,60,60,0.5); font-size:18px; font-weight:700;">종료</button>
   </div>
 </div>
 
@@ -450,6 +451,7 @@
     </div>
   </div>
   
+  <div id="accumulateNotice" style="display:none; width:100%; max-width:400px; background:rgba(93,206,175,0.2); border:1px solid rgba(93,206,175,0.4); border-radius:12px; padding:12px 16px; font-size:13px; color:#5dceaf; margin-bottom:12px; text-align:center;"></div>
   <button type="button" class="save-btn" id="saveBtn" style="width:100%; max-width:400px; padding:14px;">기록 저장하기</button>
   
   <div class="hint" style="margin-top:20px;">저장하면 '기록' 탭에서 추이를 볼 수 있어요</div>
@@ -709,6 +711,10 @@
     var settings = document.getElementById('settings');
     if (!isRunning && phase === 'ready') settings.classList.remove('hidden');
     else settings.classList.add('hidden');
+
+    var midWorkout = phase === 'work' || phase === 'rest' || phase === 'countdown';
+    document.getElementById('resetBtn').style.display = midWorkout ? 'none' : '';
+    document.getElementById('stopBtn').style.display = midWorkout ? '' : 'none';
   }
   
   function adjustSetting(type, delta) {
@@ -809,20 +815,39 @@
     phase = 'finished';
     secondsRemaining = 0;
     playFinish();
-    setTimeout(function() { showResultPage(); }, 1500);
+    setTimeout(function() { showResultPage(false); }, 1500);
+  }
+
+  function stopEarly() {
+    if (totalWorkTime === 0 && completedRounds === 0) { resetTimer(); return; }
+    pauseTimer();
+    phase = 'finished';
+    playFinish();
+    showResultPage(true);
   }
   
   // ===== 결과 페이지 =====
-  function showResultPage() {
+  function showResultPage(isEarly) {
     var totalSec = totalWorkTime + totalRestTime;
     var minutes = Math.round(totalSec / 60);
     var kcal = calcKcal(totalWorkTime, totalRestTime, lastWeight);
-    
+
+    document.querySelector('#pageResult .section-title').textContent = isEarly ? '💪 운동 종료' : '🎉 운동 완료!';
     document.getElementById('resultTime').innerHTML = minutes + '<span class="stat-unit">분</span>';
     document.getElementById('resultRounds').innerHTML = completedRounds + '<span class="stat-unit">회</span>';
     document.getElementById('resultKcal').textContent = kcal + ' kcal';
     document.getElementById('weightInput').value = lastWeight;
-    
+
+    // 오늘 이미 기록이 있으면 누적 안내 표시
+    var todayRec = loadRecords().find(function(r) { return r.date === getTodayStr(); });
+    var notice = document.getElementById('accumulateNotice');
+    if (todayRec) {
+      notice.textContent = '오늘 이미 ' + todayRec.kcal + 'kcal 기록 있음 → 저장 시 합산됩니다';
+      notice.style.display = '';
+    } else {
+      notice.style.display = 'none';
+    }
+
     switchTab('result');
   }
   
@@ -839,25 +864,42 @@
     var w = parseFloat(document.getElementById('weightInput').value) || lastWeight;
     lastWeight = w;
     saveLastWeight(w);
-    
-    // 체중도 자동 저장 (오늘 날짜로)
+
     var weights = loadWeights();
     weights[getTodayStr()] = w;
     saveWeights(weights);
-    
+
     var records = loadRecords();
-    var today = new Date();
-    records.push({
-      date: getTodayStr(),
-      timestamp: today.getTime(),
-      rounds: completedRounds,
-      workSec: totalWorkTime,
-      restSec: totalRestTime,
-      kcal: calcKcal(totalWorkTime, totalRestTime, w),
-      weight: w
-    });
+    var todayStr = getTodayStr();
+    var newKcal = calcKcal(totalWorkTime, totalRestTime, w);
+    var existingIdx = -1;
+    for (var i = 0; i < records.length; i++) {
+      if (records[i].date === todayStr) { existingIdx = i; break; }
+    }
+
+    if (existingIdx >= 0) {
+      var ex = records[existingIdx];
+      ex.rounds += completedRounds;
+      ex.workSec += totalWorkTime;
+      ex.restSec += totalRestTime;
+      ex.kcal += newKcal;
+      ex.weight = w;
+      ex.timestamp = Date.now();
+      ex.sessions = (ex.sessions || 1) + 1;
+    } else {
+      records.push({
+        date: todayStr,
+        timestamp: Date.now(),
+        rounds: completedRounds,
+        workSec: totalWorkTime,
+        restSec: totalRestTime,
+        kcal: newKcal,
+        weight: w,
+        sessions: 1
+      });
+    }
     saveRecords(records);
-    
+
     alert('기록이 저장되었습니다! 💪');
     resetTimer();
     switchTab('history');
@@ -890,7 +932,7 @@
       html += '<div class="record-item">' +
         '<div>' +
           '<div class="record-date">' + dateLabel + '</div>' +
-          '<div class="record-details">' + r.rounds + '라운드 · ' + minutes + '분 · ' + r.weight + 'kg</div>' +
+          '<div class="record-details">' + r.rounds + '라운드 · ' + minutes + '분 · ' + r.weight + 'kg' + (r.sessions > 1 ? ' · ' + r.sessions + '세션' : '') + '</div>' +
         '</div>' +
         '<div style="display:flex; align-items:center;">' +
           '<div class="record-stats"><b>' + r.kcal + '</b> kcal</div>' +
@@ -1269,6 +1311,7 @@
   
   bind('playBtn', toggleTimer);
   bind('resetBtn', resetTimer);
+  bind('stopBtn', stopEarly);
   bind('workMinus', function() { adjustSetting('work', -5); });
   bind('workPlus', function() { adjustSetting('work', 5); });
   bind('restMinus', function() { adjustSetting('rest', -5); });
