@@ -561,7 +561,6 @@
   
   // ===== 사운드 =====
   var audioCtx = null;
-  var _countdownSpeechTimeouts = [];
   
   function initAudio() {
     try {
@@ -595,20 +594,6 @@
   
   function playCountdown() { beep(800, 0.15, 0.3); }
 
-  // 카운트다운 음성 안내
-  var _countdownWords = { 3: '쓰리', 2: '투', 1: '원' };
-  function speakWord(text) {
-    if (!window.speechSynthesis) return;
-    try {
-      window.speechSynthesis.cancel();
-      var u = new SpeechSynthesisUtterance(text);
-      u.lang = 'ko-KR';
-      u.rate = 1.1;
-      u.pitch = 1.0;
-      window.speechSynthesis.speak(u);
-    } catch(e) {}
-  }
-
   function playCountdownBeep(n) {
     if (!audioCtx) return;
     try {
@@ -627,30 +612,6 @@
     } catch(e) {}
   }
 
-  // 버튼 클릭(사용자 제스처) 시점에서 음성 미리 예약 → iOS 호환
-  function scheduleSpeech() {
-    _countdownSpeechTimeouts.forEach(clearTimeout);
-    _countdownSpeechTimeouts = [];
-    if (phase !== 'countdown') return;
-    var S = secondsRemaining;
-    var words = [
-      { word: '쓰리', delay: (S - 3) * 1000 },
-      { word: '투',   delay: (S - 2) * 1000 },
-      { word: '원',   delay: (S - 1) * 1000 },
-    ];
-    words.forEach(function (item) {
-      if (item.delay >= 0) {
-        _countdownSpeechTimeouts.push(
-          setTimeout(function () { speakWord(item.word); }, item.delay)
-        );
-      }
-    });
-  }
-  function cancelSpeech() {
-    _countdownSpeechTimeouts.forEach(clearTimeout);
-    _countdownSpeechTimeouts = [];
-    if (window.speechSynthesis) window.speechSynthesis.cancel();
-  }
   function playWorkStart() {
     beep(1000, 0.2, 0.4);
     setTimeout(function() { beep(1200, 0.3, 0.4); }, 200);
@@ -787,19 +748,12 @@
     }
     isRunning = true;
     intervalId = setInterval(tick, 1000);
-    // iOS 음성 잠금 해제 후 카운트다운 음성 예약 (사용자 제스처 안에서 실행)
-    if (window.speechSynthesis) {
-      var unlock = new SpeechSynthesisUtterance('');
-      window.speechSynthesis.speak(unlock);
-    }
-    scheduleSpeech();
     render();
   }
   
   function pauseTimer() {
     isRunning = false;
     if (intervalId) { clearInterval(intervalId); intervalId = null; }
-    cancelSpeech();
     render();
   }
   
