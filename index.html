@@ -594,6 +594,20 @@
   
   function playCountdown() { beep(800, 0.15, 0.3); }
 
+  // 카운트다운 음성 안내
+  var _countdownWords = { 3: '쓰리', 2: '투', 1: '원' };
+  function speakWord(text) {
+    if (!window.speechSynthesis) return;
+    try {
+      window.speechSynthesis.cancel();
+      var u = new SpeechSynthesisUtterance(text);
+      u.lang = 'ko-KR';
+      u.rate = 1.1;
+      u.pitch = 1.0;
+      window.speechSynthesis.speak(u);
+    } catch(e) {}
+  }
+
   function playCountdownBeep(n) {
     if (!audioCtx) return;
     try {
@@ -609,6 +623,7 @@
       osc.start(audioCtx.currentTime);
       osc.stop(audioCtx.currentTime + 0.35);
       vibrate(50);
+      if (_countdownWords[n]) speakWord(_countdownWords[n]);
     } catch(e) {}
   }
   function playWorkStart() {
