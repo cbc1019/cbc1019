@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}경매 작품 목록{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>{{ quarter }} 분기 경매 작품</h1>
+  <form method="get" class="quarter-select">
+    <label>분기 선택:
+      <select name="quarter" onchange="this.form.submit()">
+        {% if quarter not in quarters %}<option value="{{ quarter }}">{{ quarter }}</option>{% endif %}
+        {% for q in quarters %}
+          <option value="{{ q }}" {% if q == quarter %}selected{% endif %}>{{ q }}</option>
+        {% endfor %}
+      </select>
+    </label>
+  </form>
+</div>
+
+{% if artworks %}
+<div class="grid">
+  {% for a in artworks %}
+  <a href="{{ url_for('artwork_detail', artwork_id=a.id) }}" class="card">
+    <div class="card-img">
+      {% if a.image_path %}
+        <img src="{{ url_for('static', filename=a.image_path) }}" alt="{{ a.title }}">
+      {% else %}
+        <div class="no-img">🖼️</div>
+      {% endif %}
+      <span class="status-badge status-{{ a.status }}">
+        {% if a.status == 'live' %}🔴 진행중
+        {% elif a.status == 'pending' %}⏳ 시작 전
+        {% else %}✅ 마감{% endif %}
+      </span>
+    </div>
+    <div class="card-body">
+      <h3>{{ a.title }}</h3>
+      <p class="artist">{{ a.artist_name }}</p>
+      <div class="price-row">
+        <span class="price-label">
+          {% if a.status == 'closed' %}낙찰가{% else %}현재가{% endif %}
+        </span>
+        <span class="price">
+          {% if a.current_bid %}{{ a.current_bid|krw }}
+          {% else %}{{ a.starting_price|krw }} <small>(시작가)</small>{% endif %}
+        </span>
+      </div>
+      <p class="bid-count">입찰 {{ a.bid_count }}회</p>
+    </div>
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<div class="empty">
+  <p>이번 분기에 등록된 작품이 없습니다.</p>
+</div>
+{% endif %}
+{% endblock %}

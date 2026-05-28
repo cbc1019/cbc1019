@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}관리자 대시보드{% endblock %}
+{% block content %}
+<h1>관리자 대시보드</h1>
+
+<section class="admin-section">
+  <h2>👤 작가 등록</h2>
+  <form method="post" action="{{ url_for('admin_add_artist') }}" class="form inline-form">
+    <input name="name" placeholder="작가 이름" required>
+    <input name="department" placeholder="소속 (예: 영상의학과)">
+    <input name="bio" placeholder="간단한 소개">
+    <button type="submit" class="btn btn-primary">등록</button>
+  </form>
+  <div class="artist-list">
+    {% for a in artists %}
+      <span class="chip">{{ a.name }}{% if a.department %} · {{ a.department }}{% endif %}</span>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="admin-section">
+  <h2>🎨 작품 등록</h2>
+  <form method="post" action="{{ url_for('admin_add_artwork') }}" enctype="multipart/form-data" class="form grid-form">
+    <label>작가
+      <select name="artist_id" required>
+        <option value="">선택...</option>
+        {% for a in artists %}<option value="{{ a.id }}">{{ a.name }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>분기 <input name="quarter" value="{{ current_q }}" required></label>
+    <label>작품명 <input name="title" required></label>
+    <label>이미지 <input type="file" name="image" accept="image/*"></label>
+    <label>시작가 (원) <input type="number" name="starting_price" value="10000" min="0" step="1000" required></label>
+    <label>최소 입찰 단위 (원) <input type="number" name="min_increment" value="1000" min="100" step="100" required></label>
+    <label class="full">설명 <textarea name="description" rows="2"></textarea></label>
+    <button type="submit" class="btn btn-primary full">작품 등록</button>
+  </form>
+</section>
+
+<section class="admin-section">
+  <h2>📋 등록된 작품</h2>
+  {% if artworks %}
+  <table class="data-table">
+    <thead><tr>
+      <th>분기</th><th>작품</th><th>작가</th><th>시작가</th>
+      <th>상태</th><th>낙찰가</th><th>관리</th>
+    </tr></thead>
+    <tbody>
+    {% for a in artworks %}
+      <tr>
+        <td>{{ a.quarter }}</td>
+        <td><a href="{{ url_for('artwork_detail', artwork_id=a.id) }}">{{ a.title }}</a></td>
+        <td>{{ a.artist_name }}</td>
+        <td>{{ a.starting_price|krw }}</td>
+        <td><span class="status-badge status-{{ a.status }}">
+          {% if a.status == 'live' %}진행중
+          {% elif a.status == 'pending' %}시작 전
+          {% else %}마감{% endif %}
+        </span></td>
+        <td>{{ a.winning_price|krw if a.winning_price else '-' }}</td>
+        <td class="actions">
+          {% if a.status == 'pending' %}
+            <form method="post" action="{{ url_for('admin_start', artwork_id=a.id) }}" style="display:inline">
+              <button class="btn btn-sm btn-green">시작</button>
+            </form>
+          {% elif a.status == 'live' %}
+            <form method="post" action="{{ url_for('admin_close', artwork_id=a.id) }}" style="display:inline">
+              <button class="btn btn-sm btn-orange">마감</button>
+            </form>
+          {% endif %}
+          <form method="post" action="{{ url_for('admin_delete', artwork_id=a.id) }}" style="display:inline"
+                onsubmit="return confirm('정말 삭제하시겠습니까?')">
+            <button class="btn btn-sm btn-red">삭제</button>
+          </form>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">등록된 작품이 없습니다.</p>
+  {% endif %}
+</section>
+{% endblock %}

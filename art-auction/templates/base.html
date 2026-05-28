@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block title %}병원 그림 경매{% endblock %}</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<nav class="navbar">
+  <a href="{{ url_for('index') }}" class="brand">🎨 병원 그림 경매</a>
+  <div class="nav-links">
+    {% if current_user.id %}
+      <a href="{{ url_for('index') }}">경매 목록</a>
+      <a href="{{ url_for('reports') }}">통계</a>
+      {% if current_user.is_admin %}
+        <a href="{{ url_for('admin_dashboard') }}">관리</a>
+      {% endif %}
+      <span class="user-info">{{ current_user.name }}</span>
+      <a href="{{ url_for('logout') }}" class="logout">로그아웃</a>
+    {% else %}
+      <a href="{{ url_for('login') }}">로그인</a>
+      <a href="{{ url_for('register') }}">가입</a>
+    {% endif %}
+  </div>
+</nav>
+
+<main class="container">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, msg in messages %}
+      <div class="flash flash-{{ category }}">{{ msg }}</div>
+    {% endfor %}
+  {% endwith %}
+  {% block content %}{% endblock %}
+</main>
+
+{% block scripts %}{% endblock %}
+</body>
+</html>

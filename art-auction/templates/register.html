@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}직원 가입{% endblock %}
+{% block content %}
+<div class="auth-card">
+  <h1>직원 가입</h1>
+  <form method="post" class="form">
+    <label>아이디 <input name="username" required></label>
+    <label>비밀번호 <input type="password" name="password" required minlength="4"></label>
+    <label>이름 <input name="display_name" required></label>
+    <label>부서
+      <input name="department" placeholder="예: 내과, 간호3팀">
+    </label>
+    <button type="submit" class="btn btn-primary">가입하기</button>
+  </form>
+  <p class="auth-foot"><a href="{{ url_for('login') }}">로그인으로 돌아가기</a></p>
+</div>
+{% endblock %}

@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}경매 통계{% endblock %}
+{% block content %}
+<h1>📊 경매 통계 리포트</h1>
+
+<section class="report-section">
+  <h2>분기별 실적</h2>
+  <table class="data-table">
+    <thead><tr><th>분기</th><th>등록 작품</th><th>낙찰</th><th>총 매출</th></tr></thead>
+    <tbody>
+      {% for q in quarterly %}
+      <tr>
+        <td>{{ q.quarter }}</td>
+        <td>{{ q.total }}</td>
+        <td>{{ q.sold }}</td>
+        <td><strong>{{ q.revenue|krw }}</strong></td>
+      </tr>
+      {% else %}
+      <tr><td colspan="4" class="muted">데이터 없음</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+<section class="report-section">
+  <h2>작가별 실적</h2>
+  <table class="data-table">
+    <thead><tr><th>작가</th><th>출품</th><th>낙찰</th><th>매출</th></tr></thead>
+    <tbody>
+      {% for a in by_artist %}
+      <tr>
+        <td>{{ a.artist_name }}</td>
+        <td>{{ a.works }}</td>
+        <td>{{ a.sold }}</td>
+        <td><strong>{{ a.revenue|krw }}</strong></td>
+      </tr>
+      {% else %}
+      <tr><td colspan="4" class="muted">데이터 없음</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+<section class="report-section">
+  <h2>🏆 TOP 낙찰자</h2>
+  <table class="data-table">
+    <thead><tr><th>순위</th><th>이름</th><th>부서</th><th>낙찰 건수</th><th>총 지출</th></tr></thead>
+    <tbody>
+      {% for b in top_bidders %}
+      <tr>
+        <td>{{ loop.index }}</td>
+        <td>{{ b.display_name }}</td>
+        <td>{{ b.department or '-' }}</td>
+        <td>{{ b.won_count }}</td>
+        <td><strong>{{ b.spent|krw }}</strong></td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" class="muted">아직 낙찰자가 없습니다</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+<section class="report-section">
+  <h2>최근 낙찰 기록</h2>
+  <table class="data-table">
+    <thead><tr><th>분기</th><th>작품</th><th>작가</th><th>낙찰자</th><th>낙찰가</th></tr></thead>
+    <tbody>
+      {% for r in recent_sold %}
+      <tr>
+        <td>{{ r.quarter }}</td>
+        <td>{{ r.title }}</td>
+        <td>{{ r.artist_name }}</td>
+        <td>{{ r.winner or '유찰' }}</td>
+        <td><strong>{{ r.winning_price|krw }}</strong></td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" class="muted">아직 낙찰된 작품이 없습니다</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

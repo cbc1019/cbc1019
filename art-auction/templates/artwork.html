@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% block title %}{{ artwork.title }}{% endblock %}
+{% block content %}
+<a href="{{ url_for('index', quarter=artwork.quarter) }}" class="back-link">← 목록으로</a>
+
+<div class="detail-grid">
+  <div class="detail-img">
+    {% if artwork.image_path %}
+      <img src="{{ url_for('static', filename=artwork.image_path) }}" alt="{{ artwork.title }}">
+    {% else %}
+      <div class="no-img big">🖼️</div>
+    {% endif %}
+  </div>
+
+  <div class="detail-info">
+    <span class="status-badge status-{{ artwork.status }} big">
+      {% if artwork.status == 'live' %}🔴 진행중
+      {% elif artwork.status == 'pending' %}⏳ 시작 전
+      {% else %}✅ 마감{% endif %}
+    </span>
+    <h1>{{ artwork.title }}</h1>
+    <p class="artist-big">작가: <strong>{{ artwork.artist_name }}</strong></p>
+    {% if artwork.artist_bio %}<p class="bio">{{ artwork.artist_bio }}</p>{% endif %}
+    {% if artwork.description %}<p class="description">{{ artwork.description }}</p>{% endif %}
+
+    <div class="bid-panel">
+      <div class="current-price">
+        <span class="label">{% if artwork.status == 'closed' %}최종 낙찰가{% else %}현재 최고가{% endif %}</span>
+        <span class="amount" id="current-amount">
+          {% if current_bid %}{{ current_bid|krw }}
+          {% else %}{{ artwork.starting_price|krw }} <small>(시작가)</small>{% endif %}
+        </span>
+      </div>
+
+      {% if artwork.status == 'live' %}
+        <form id="bid-form" class="bid-form">
+          <input type="hidden" name="artwork_id" value="{{ artwork.id }}">
+          <label>입찰가 (최소 {{ min_next|krw }})
+            <input type="number" name="amount" id="bid-amount" min="{{ min_next }}"
+                   step="{{ artwork.min_increment }}" value="{{ min_next }}" required>
+          </label>
+          <button type="submit" class="btn btn-primary">입찰하기</button>
+          <p id="bid-msg" class="bid-msg"></p>
+        </form>
+      {% elif artwork.status == 'pending' %}
+        <p class="muted">아직 경매가 시작되지 않았습니다.</p>
+      {% else %}
+        {% if artwork.winner_name %}
+          <p class="winner">🏆 낙찰자: <strong>{{ artwork.winner_name }}</strong></p>
+        {% else %}
+          <p class="muted">유찰되었습니다.</p>
+        {% endif %}
+      {% endif %}
+    </div>
+
+    <div class="bid-history">
+      <h3>입찰 기록 <span id="bid-count">({{ bids|length }}건)</span></h3>
+      <ul id="bid-list">
+        {% for b in bids %}
+          <li>
+            <span class="bidder">{{ b.display_name }}</span>
+            <span class="bid-amount">{{ b.amount|krw }}</span>
+            <span class="bid-time">{{ b.created_at[:19].replace('T', ' ') }}</span>
+          </li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+<script>
+  const ARTWORK_ID = {{ artwork.id }};
+  const MIN_INC = {{ artwork.min_increment }};
+  const socket = io();
+
+  socket.on('connect', () => socket.emit('join_artwork', {artwork_id: ARTWORK_ID}));
+
+  socket.on('bid_update', (data) => {
+    if (data.artwork_id !== ARTWORK_ID) return;
+    document.getElementById('current-amount').textContent =
+      data.amount.toLocaleString('ko-KR') + '원';
+    const list = document.getElementById('bid-list');
+    const li = document.createElement('li');
+    li.innerHTML = `<span class="bidder">${data.bidder}</span>
+                    <span class="bid-amount">${data.amount.toLocaleString('ko-KR')}원</span>
+                    <span class="bid-time">${data.time}</span>`;
+    li.classList.add('new-bid');
+    list.prepend(li);
+    const cnt = document.getElementById('bid-count');
+    if (cnt) cnt.textContent = '(' + (list.children.length) + '건)';
+    const amt = document.getElementById('bid-amount');
+    if (amt) {
+      const next = data.amount + MIN_INC;
+      amt.min = next; amt.value = next;
+    }
+  });
+
+  socket.on('auction_closed', (data) => {
+    if (data.artwork_id === ARTWORK_ID) location.reload();
+  });
+
+  const form = document.getElementById('bid-form');
+  if (form) {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const msg = document.getElementById('bid-msg');
+      msg.textContent = '입찰 중...'; msg.className = 'bid-msg';
+      const fd = new FormData(form);
+      const res = await fetch('/api/bid', {method: 'POST', body: fd});
+      const data = await res.json();
+      if (data.ok) {
+        msg.textContent = '✅ 입찰 완료!'; msg.classList.add('success');
+      } else {
+        msg.textContent = '❌ ' + data.error; msg.classList.add('error');
+      }
+    });
+  }
+</script>
+{% endblock %}
