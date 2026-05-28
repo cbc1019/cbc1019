@@ -1,0 +1,21 @@
+{
+  "name": "cloudflare-auction",
+  "version": "1.0.0",
+  "private": true,
+  "description": "병원 그림 분기별 실시간 경매 - Cloudflare Workers",
+  "main": "src/index.ts",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:init": "wrangler d1 execute auction-db --remote --file=./schema.sql",
+    "db:init-local": "wrangler d1 execute auction-db --local --file=./schema.sql"
+  },
+  "dependencies": {
+    "hono": "^4.6.14"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20241218.0",
+    "typescript": "^5.7.2",
+    "wrangler": "^3.99.0"
+  }
+}

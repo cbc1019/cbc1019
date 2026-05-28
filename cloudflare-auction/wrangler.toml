@@ -1,0 +1,24 @@
+name = "art-auction"
+main = "src/index.ts"
+compatibility_date = "2024-12-18"
+compatibility_flags = ["nodejs_compat"]
+
+# Secret: SESSION_SECRET (set via `wrangler secret put SESSION_SECRET`)
+# Optional: ADMIN_PASSWORD (initial admin password, default 'admin1234')
+
+[[d1_databases]]
+binding = "DB"
+database_name = "auction-db"
+database_id = "REPLACE_WITH_D1_ID"
+
+[[r2_buckets]]
+binding = "IMAGES"
+bucket_name = "art-auction-images"
+
+[[durable_objects.bindings]]
+name = "AUCTION_ROOM"
+class_name = "AuctionRoom"
+
+[[migrations]]
+tag = "v1"
+new_classes = ["AuctionRoom"]
