@@ -367,7 +367,12 @@
     padding: 10px 8px;
     flex: none;
   }
-  .field-row input.kcal { flex: 0 0 84px; }
+  .field-row input.kcal { flex: 0 0 76px; }
+  .food-row { flex-wrap: nowrap; gap: 6px; }
+  .food-row select { padding: 10px 4px; }
+  .food-row input { padding: 10px 8px; }
+  .food-row button { padding: 10px 14px; }
+  .chip .k { color: var(--muted); margin-left: 6px; font-variant-numeric: tabular-nums; }
   .field-row label { flex: 0 0 76px; font-size: 14px; color: var(--muted); }
   .field-row select.wide { flex: 1; min-width: 0; }
   .meal-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
@@ -487,25 +492,22 @@
 
     <div class="block">
       <h2>먹은 것 추가</h2>
-      <form id="foodForm" class="block">
-        <div class="field-row">
-          <select id="fMeal" aria-label="끼니">
-            <option value="b">아침</option>
-            <option value="l">점심</option>
-            <option value="d">저녁</option>
-            <option value="s">간식</option>
-          </select>
-          <input type="text" id="fName" list="foodList" maxlength="30" placeholder="음식 이름" autocomplete="off" aria-label="음식 이름" required>
-        </div>
-        <div class="field-row">
-          <input type="number" id="fKcal" class="kcal" inputmode="numeric" min="0" max="9999" step="1" placeholder="열량" aria-label="열량 (kcal)" required>
-          <span class="unit">kcal</span>
-          <span style="flex:1"></span>
-          <button type="submit">추가</button>
-        </div>
-        <datalist id="foodList"></datalist>
+      <form id="foodForm" class="field-row food-row">
+        <select id="fMeal" aria-label="끼니">
+          <option value="b">아침</option>
+          <option value="l">점심</option>
+          <option value="d">저녁</option>
+          <option value="s">간식</option>
+        </select>
+        <input type="text" id="fName" maxlength="30" placeholder="음식" autocomplete="off" aria-label="음식 이름" required>
+        <input type="number" id="fKcal" class="kcal" inputmode="numeric" min="0" max="9999" step="1" placeholder="kcal" aria-label="열량 (kcal)" required>
+        <button type="submit">추가</button>
       </form>
-      <p class="note">목록에서 고른 음식의 열량은 1인분 기준 대략적인 값입니다. 숫자는 고쳐서 넣을 수 있습니다.</p>
+    </div>
+
+    <div class="block" id="recentBlock" hidden>
+      <h2>이전에 입력한 음식 (누르면 바로 추가)</h2>
+      <div class="chips" id="recentFoods"></div>
     </div>
 
     <div id="dMeals" class="block" style="gap:18px"></div>
@@ -919,21 +921,10 @@
 
   // ===== 식단 화면 =====
   var MEALS = [['b', '아침'], ['l', '점심'], ['d', '저녁'], ['s', '간식']];
-  // 1인분 기준 대략적인 열량 (kcal)
-  var FOODS = [
-    ['쌀밥 1공기', 310], ['잡곡밥 1공기', 300], ['김치찌개 1인분', 240], ['된장찌개 1인분', 150], ['미역국 1그릇', 90],
-    ['비빔밥 1그릇', 590], ['김밥 1줄', 480], ['라면 1봉지', 500], ['떡볶이 1인분', 300], ['짜장면 1그릇', 800],
-    ['짬뽕 1그릇', 700], ['삼겹살 1인분(200g)', 660], ['닭가슴살 100g', 110], ['삶은 달걀 1개', 75], ['계란후라이 1개', 90],
-    ['두부 반 모', 130], ['고구마 1개', 170], ['바나나 1개', 90], ['사과 1개', 130], ['식빵 1장', 100],
-    ['우유 1컵', 130], ['플레인 요거트 1개', 90], ['아메리카노 1잔', 10], ['카페라떼 1잔', 180], ['맥주 500ml', 190], ['소주 1병', 400]
-  ];
   var meals = load('meals', {});
   var targetKg = Number(load('targetKg', 0)) || 0;
   var profile = load('profile', {}) || {};
   var dietDate = dateStr(new Date());
-  var autoKcal = '';
-
-  $('foodList').innerHTML = FOODS.map(function (f) { return '<option value="' + f[0] + '"></option>'; }).join('');
 
   function shiftDate(d, days) {
     var p = d.split('-'), t = new Date(+p[0], +p[1] - 1, +p[2] + days);
@@ -970,6 +961,7 @@
   function dayTotal(d) { return (meals[d] || []).reduce(function (a, it) { return a + it.k; }, 0); }
 
   var dietBars = [];
+  var recentFoods = [];
   function drawDietChart(goal) {
     var box = $('dChart'), today = dateStr(new Date());
     var end = dietDate < shiftDate(today, -6) ? dietDate : today;
@@ -1069,6 +1061,20 @@
     }).join('');
     $('dEmpty').hidden = items.length > 0;
 
+    // 이전에 입력한 음식: 최근 것부터, 이름·열량이 같은 것은 한 번만
+    var seen = {};
+    recentFoods = [];
+    Object.keys(meals).sort().reverse().forEach(function (d) {
+      meals[d].slice().reverse().forEach(function (it) {
+        var key = it.n + '|' + it.k;
+        if (!seen[key] && recentFoods.length < 15) { seen[key] = 1; recentFoods.push({ n: it.n, k: it.k }); }
+      });
+    });
+    $('recentBlock').hidden = !recentFoods.length;
+    $('recentFoods').innerHTML = recentFoods.map(function (f, i) {
+      return '<span class="chip"><button type="button" data-i="' + i + '">' + esc(f.n) + '<span class="k">' + num(f.k) + '</span></button></span>';
+    }).join('');
+
   }
 
   // ===== 설정 화면 =====
@@ -1102,21 +1108,24 @@
 
   $('dPrev').addEventListener('click', function () { dietDate = shiftDate(dietDate, -1); renderDiet(); });
   $('dNext').addEventListener('click', function () { dietDate = shiftDate(dietDate, 1); renderDiet(); });
-  $('fName').addEventListener('input', function () {
-    var name = this.value.trim(), kcalEl = $('fKcal');
-    var hit = FOODS.filter(function (f) { return f[0] === name; })[0];
-    if (hit && (kcalEl.value === '' || kcalEl.value === autoKcal)) { kcalEl.value = autoKcal = String(hit[1]); }
+  function addFood(name, k) {
+    (meals[dietDate] = meals[dietDate] || []).push({ m: $('fMeal').value, n: name, k: k });
+    save('meals', meals);
+    renderDiet();
+  }
+  $('recentFoods').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    var f = recentFoods[Number(b.dataset.i)];
+    if (f) addFood(f.n, f.k);
   });
   $('foodForm').addEventListener('submit', function (e) {
     e.preventDefault();
     var name = $('fName').value.trim(), k = Math.round(parseFloat($('fKcal').value));
     if (!name) { $('fName').focus(); return; }
     if (!isFinite(k) || k < 0 || k > 9999) { $('fKcal').focus(); return; }
-    (meals[dietDate] = meals[dietDate] || []).push({ m: $('fMeal').value, n: name, k: k });
-    save('meals', meals);
-    $('fName').value = ''; $('fKcal').value = ''; autoKcal = '';
+    $('fName').value = ''; $('fKcal').value = '';
     $('fKcal').blur();
-    renderDiet();
+    addFood(name, k);
   });
   $('dMeals').addEventListener('click', function (e) {
     var b = e.target.closest('.del'); if (!b) return;
