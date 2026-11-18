@@ -269,14 +269,7 @@
   .step-val.txt { font-family: var(--body); font-size: 17px; font-weight: 600; }
   .gone { visibility: hidden; }
 
-  /* ===== 모드 선택 · 하단 탭 ===== */
-  .modes {
-    display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px;
-    background: var(--line); border-radius: 12px; padding: 4px;
-  }
-  .modes button { padding: 10px 4px; border-radius: 9px; font-weight: 600; color: var(--muted); }
-  .modes button[aria-pressed="true"] { background: var(--surface); color: var(--ink); }
-
+  /* ===== 하단 탭 ===== */
   .tabbar {
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 5;
     display: flex; justify-content: center;
@@ -356,21 +349,10 @@
       <button type="button" class="toggle" id="soundBtn" aria-pressed="true">소리 켜짐</button>
     </div>
 
-    <div class="modes" id="modes">
-      <button type="button" data-mode="interval">버피테스트</button>
-      <button type="button" data-mode="rope">줄넘기</button>
-      <button type="button" data-mode="run">러닝</button>
-    </div>
-
     <div class="rows" id="rows"></div>
 
     <div class="plan">
-      <div class="plan-top" id="planTop">
-        <div class="plan-total" id="planTotal">0:00</div>
-        <div class="plan-sub" id="planSub"></div>
-      </div>
-      <div class="timeline" id="planLine" aria-hidden="true"></div>
-      <button type="button" class="primary" id="startBtn">운동 시작</button>
+      <button type="button" class="primary" id="startBtn">버피테스트 시작</button>
     </div>
 
   </section>
@@ -460,7 +442,6 @@
 
     <div class="run-info">
       <div class="run-next" id="runNext"></div>
-      <div class="timeline" id="runLine" aria-hidden="true"></div>
       <div class="run-left" id="runLeft"></div>
     </div>
 
@@ -476,15 +457,8 @@
   <section class="view" id="viewDone" hidden>
     <div class="done-title" id="doneTitle">운동 완료</div>
     <div class="stats" id="doneStats"></div>
-    <div class="block" id="doneInputBlock">
-      <h2 id="doneInputLabel">거리</h2>
-      <div class="field-row">
-        <input type="number" id="doneInput" inputmode="decimal" min="0" aria-labelledby="doneInputLabel">
-        <span class="unit" id="doneInputUnit">km</span>
-      </div>
-    </div>
     <p class="note" id="doneNote" hidden>체중 탭에서 체중을 기록하면 소모 칼로리를 추정합니다.</p>
-    <button type="button" class="primary" id="againBtn">같은 운동 다시 하기</button>
+    <button type="button" class="primary" id="againBtn">버피테스트 다시 하기</button>
     <button type="button" class="ghost" id="backBtn">처음으로 돌아가기</button>
   </section>
 </main>
@@ -531,32 +505,11 @@
         { k: 'work', label: '운동', min: 5, max: 600, step: 5, phase: 'work', fmt: clock },
         { k: 'rest', label: '휴식', min: 0, max: 600, step: 5, phase: 'rest', fmt: clock, zero: '없음' }
       ]
-    },
-    rope: {
-      label: '줄넘기',
-      def: { prep: 5, work: 60, rest: 30, sets: 5, bpm: 0 },
-      fields: [
-        { k: 'prep', label: '준비',      min: 0,  max: 60,   step: 5,  phase: 'prep', fmt: clock, zero: '없음' },
-        { k: 'work', label: '줄넘기',    min: 10, max: 1800, step: 10, phase: 'work', fmt: clock },
-        { k: 'rest', label: '휴식',      min: 0,  max: 600,  step: 5,  phase: 'rest', fmt: clock, zero: '없음' },
-        { k: 'sets', label: '세트',      min: 1,  max: 30,   step: 1,  fmt: function (v) { return v + '세트'; } },
-        { k: 'bpm',  label: '박자 소리', min: 0,  floor: 80, max: 220, step: 10, txt: true,
-          fmt: function (v) { return '분당 ' + v + '회'; }, zero: '없음' }
-      ]
-    },
-    run: {
-      label: '러닝',
-      def: { prep: 5, target: 1800, alert: 300 },
-      fields: [
-        { k: 'prep',   label: '준비',      min: 0, max: 60, step: 5, phase: 'prep', fmt: clock, zero: '없음' },
-        { k: 'target', label: '목표 시간', min: 0, floor: 300, max: 14400, step: 300, phase: 'work', txt: true,
-          fmt: function (v) { return v / 60 + '분'; }, zero: '자유 달리기' },
-        { k: 'alert',  label: '시간 알림', min: 0, floor: 60, max: 1800, step: 60, txt: true,
-          fmt: function (v) { return v / 60 + '분마다'; }, zero: '없음' }
-      ]
     }
   };
-  var MODE_KEYS = ['interval', 'rope', 'run'];
+  var MODE_KEYS = ['interval'];
+  // 예전 줄넘기·러닝 기록도 기록 탭에서 이름이 보이도록 남겨 둔다.
+  var OLD_LABELS = { rope: '줄넘기', run: '러닝' };
 
   // ===== 저장소 (없어도 동작) =====
   function load(key, fallback) {
@@ -588,8 +541,7 @@
   var savedCfgs = load('cfgs2', null) || {};
   var cfgs = {};
   MODE_KEYS.forEach(function (m) { cfgs[m] = sanitize(m, savedCfgs[m] || MODES[m].def); });
-  var mode = load('mode', 'interval');
-  if (!MODES[mode]) mode = 'interval';
+  var mode = 'interval';
   var log = load('log', []);
   var soundOn = load('sound', true);
   var weights = loadWeights();
@@ -614,31 +566,13 @@
   }
 
   // ===== 구간 목록 만들기 =====
-  function buildSteps(m, c) {
-    var steps = [], s;
-    if (c.prep > 0) steps.push({ type: 'prep', label: '준비', dur: c.prep, pos: '' });
-    if (m === 'interval') {
-      // 버피테스트는 끝낼 때까지 운동·휴식을 반복한다 (타이머가 마지막 구간에서 처음 운동으로 되돌아간다).
-      steps.push({ type: 'work', label: '운동', dur: c.work, pos: '' });
-      if (c.rest > 0) steps.push({ type: 'rest', label: '휴식', dur: c.rest, pos: '' });
-    } else if (m === 'rope') {
-      for (s = 1; s <= c.sets; s++) {
-        steps.push({ type: 'work', label: '줄넘기', dur: c.work, pos: '세트 ' + s + '/' + c.sets });
-        if (s < c.sets && c.rest > 0) steps.push({ type: 'rest', label: '휴식', dur: c.rest, pos: '세트 ' + s + '/' + c.sets + ' 끝' });
-      }
-    } else {
-      steps.push({ type: 'work', label: '러닝', up: true, open: !c.target, dur: c.target || 86400,
-        pos: c.target ? '목표 ' + words(c.target) : '자유 달리기' });
-    }
+  // 끝낼 때까지 운동·휴식을 반복한다 (타이머가 마지막 구간에서 처음 운동으로 되돌아간다).
+  function buildSteps(c) {
+    var steps = [];
+    if (c.prep > 0) steps.push({ type: 'prep', label: '준비', dur: c.prep });
+    steps.push({ type: 'work', label: '운동', dur: c.work });
+    if (c.rest > 0) steps.push({ type: 'rest', label: '휴식', dur: c.rest });
     return steps;
-  }
-  function totalOf(steps) { return steps.reduce(function (a, s) { return a + s.dur; }, 0); }
-
-  function drawLine(el, steps) {
-    el.className = 'timeline' + (steps.length <= 60 ? ' gap' : '');
-    el.innerHTML = steps.map(function (s) {
-      return '<div class="seg ' + s.type + '" style="flex-grow:' + s.dur + '"></div>';
-    }).join('');
   }
 
   // ===== 운동 설정 화면 =====
@@ -656,9 +590,6 @@
 
   function renderSetup() {
     var c = cfgs[mode];
-    Array.prototype.forEach.call($('modes').children, function (b) {
-      b.setAttribute('aria-pressed', String(b.dataset.mode === mode));
-    });
     MODES[mode].fields.forEach(function (f) {
       var el = $('val-' + f.k), v = c[f.k];
       var off = f.zero && v === 0;
@@ -666,25 +597,6 @@
       el.className = 'step-val' + (off ? ' off' : f.txt ? ' txt' : '');
       if (f.showIf) el.closest('.row').hidden = !f.showIf(c);
     });
-
-    var steps = buildSteps(mode, c);
-    var total, sub;
-    if (mode === 'interval') {
-      total = clock(c.work + c.rest);
-      sub = '한 라운드 · 끝낼 때까지 반복합니다';
-    } else if (mode === 'rope') {
-      total = clock(totalOf(steps));
-      sub = '줄넘기 ' + words(c.work * c.sets) + (c.bpm ? ' · 약 ' + Math.round(c.bpm * c.work * c.sets / 60) + '회' : ' · ' + c.sets + '세트');
-    } else {
-      total = c.target ? clock(c.target) : '자유';
-      sub = (c.target ? '목표 시간에 끝납니다' : '끝낼 때까지 잽니다') + (c.alert ? ' · ' + c.alert / 60 + '분마다 알림' : '');
-    }
-    $('planTotal').textContent = total;
-    $('planSub').textContent = sub;
-    $('planLine').hidden = mode !== 'rope';
-    $('planTop').hidden = mode === 'interval';
-    drawLine($('planLine'), steps);
-    $('startBtn').textContent = MODES[mode].label + ' 시작';
 
     $('soundBtn').textContent = soundOn ? '소리 켜짐' : '소리 꺼짐';
     $('soundBtn').setAttribute('aria-pressed', String(soundOn));
@@ -718,14 +630,6 @@
     var b = e.target.closest('.step-btn'); if (!b) return;
     if (held) { held = false; return; }
     adjust(b.closest('.row').dataset.k, Number(b.dataset.d));
-  });
-
-  $('modes').addEventListener('click', function (e) {
-    var b = e.target.closest('button'); if (!b) return;
-    mode = b.dataset.mode;
-    save('mode', mode);
-    renderRows();
-    renderSetup();
   });
 
   $('soundBtn').addEventListener('click', function () {
@@ -890,7 +794,7 @@
   // ===== 기록 화면 =====
   function recLine(r) {
     var m = r.mode || 'interval';
-    var title = MODES[m].label;
+    var title = OLD_LABELS[m] || MODES.interval.label;
     var bits = [clock(m === 'run' ? r.work : r.total)];
     if (m === 'interval') bits.push(r.rounds + '라운드');
     if (m === 'rope') bits.push(r.count > 0 ? r.count + '회' : r.rounds + '세트');
@@ -953,7 +857,6 @@
     else if (type === 'prep') { tone(660, 0, 0.2, 0.4); }
     else { tone(520, 0, 0.5, 0.45); buzz(250); }
   }
-  function cueAlert() { tone(880, 0, 0.15, 0.45); tone(880, 0.22, 0.15, 0.45); buzz([100, 80, 100]); }
   function cueFinish() {
     [784, 988, 1175, 1568].forEach(function (f, i) { tone(f, i * 0.16, i === 3 ? 0.6 : 0.16, 0.5); });
     buzz([200, 100, 200, 100, 400]);
@@ -1000,18 +903,12 @@
   function startWorkout() {
     initAudio();
     var c = cfgs[mode];
-    var steps = buildSteps(mode, c);
     run = {
-      mode: mode, steps: steps,
-      name: MODES[mode].label,
-      loop: mode === 'interval', loopStart: c.prep > 0 ? 1 : 0, lap: 0,
-      bpm: mode === 'rope' ? c.bpm : 0, alert: mode === 'run' ? c.alert : 0,
-      idx: 0, endsAt: 0, credited: 0, paused: false, pausedLeft: 0, nextBeat: 0,
-      total: 0, work: 0, rounds: 0, beatSec: 0, lastSec: -1
+      mode: mode, steps: buildSteps(c), name: MODES[mode].label,
+      loopStart: c.prep > 0 ? 1 : 0, lap: 0,
+      idx: 0, endsAt: 0, credited: 0, paused: false, pausedLeft: 0,
+      total: 0, work: 0, rounds: 0, lastSec: -1
     };
-    drawLine($('runLine'), steps);
-    var solo = mode === 'run';
-    $('runLine').classList.toggle('gone', solo || run.loop);
     show('run');
     keepAwake();
     enter(0, Date.now());
@@ -1025,7 +922,6 @@
     run.endsAt = now + run.steps[idx].dur * 1000;
     run.credited = now;
     run.lastSec = -1;
-    run.nextBeat = audioCtx ? audioCtx.currentTime + 0.7 : 0;
     cueStart(run.steps[idx].type);
     renderStep();
   }
@@ -1033,7 +929,7 @@
   function credit(until) {
     var dt = Math.max(0, until - run.credited) / 1000;
     run.total += dt;
-    if (run.steps[run.idx].type === 'work') { run.work += dt; if (run.bpm) run.beatSec += dt; }
+    if (run.steps[run.idx].type === 'work') run.work += dt;
     run.credited = until;
   }
 
@@ -1045,38 +941,18 @@
       credit(end);
       if (run.steps[run.idx].type === 'work') run.rounds += 1;
       if (run.idx + 1 < run.steps.length) enter(run.idx + 1, end);
-      else if (run.loop) { run.lap += 1; enter(run.loopStart, end); }
-      else { finish(false); return; }
+      else { run.lap += 1; enter(run.loopStart, end); }
     }
     credit(now);
-    beat(now);
     renderClock(now);
   }
 
-  // 줄넘기 박자: 오디오 시계에 조금 앞서 예약해 간격이 흔들리지 않게 한다.
-  function beat(now) {
-    var s = run.steps[run.idx];
-    if (!run.bpm || s.type !== 'work' || !soundOn || !audioCtx) return;
-    var t = audioCtx.currentTime;
-    if (run.nextBeat < t) run.nextBeat = t + 0.05;
-    var stepEnd = t + (run.endsAt - now) / 1000;
-    while (run.nextBeat < t + 0.3) {
-      if (run.nextBeat < stepEnd - 0.05) toneAt(1400, run.nextBeat, 0.04, 0.3, 'square');
-      run.nextBeat += 60 / run.bpm;
-    }
-  }
-
   function renderStep() {
-    var s = run.steps[run.idx], n = run.steps[run.idx + 1] || (run.loop ? run.steps[run.loopStart] : null);
+    var s = run.steps[run.idx], n = run.steps[run.idx + 1] || run.steps[run.loopStart];
     document.body.dataset.phase = s.type;
     $('phaseName').textContent = s.label;
-    $('runPos').textContent = (run.loop && s.type !== 'prep' ? '라운드 ' + (run.lap + 1) : s.pos) || ' ';
-    if (run.mode === 'run') $('runNext').textContent = s.up ? (run.alert ? run.alert / 60 + '분마다 알림' : ' ') : '곧 러닝 시작';
-    else $('runNext').textContent = n ? '다음 ' + n.label + ' ' + words(n.dur) : '마지막 구간';
-    var segs = $('runLine').children;
-    for (var i = 0; i < segs.length; i++) {
-      segs[i].className = 'seg' + (i < run.idx ? ' done' : i === run.idx ? ' now' : '');
-    }
+    $('runPos').textContent = s.type === 'prep' ? ' ' : '라운드 ' + (run.lap + 1);
+    $('runNext').textContent = '다음 ' + n.label + ' ' + words(n.dur);
   }
 
   function renderClock(now) {
@@ -1084,33 +960,21 @@
     var leftMs = run.paused ? run.pausedLeft : Math.max(0, run.endsAt - now);
     var left = Math.ceil(leftMs / 1000);
     if (left !== run.lastSec) {
-      var shown = s.up ? s.dur - left : left;
-      if (!run.paused && run.lastSec !== -1) {
-        if (!s.open && left >= 1 && left <= 3 && s.dur > 3) cueTick();
-        else if (s.up && run.alert && shown > 0 && shown % run.alert === 0) cueAlert();
-      }
+      if (!run.paused && run.lastSec !== -1 && left >= 1 && left <= 3 && s.dur > 3) cueTick();
       run.lastSec = left;
       var el = $('clock');
-      el.textContent = (s.up || shown >= 60) ? clock(shown) : shown;
-      el.className = 'clock' + (shown >= 3600 ? ' xlong' : (s.up || shown >= 60) ? ' long' : '');
-      if (s.open) $('runLeft').textContent = ' ';
-      else if (run.loop) $('runLeft').textContent = '경과 시간 ' + clock(run.total);
-      else if (run.mode === 'run') $('runLeft').textContent = s.up ? '남은 시간 ' + clock(left) : ' ';
-      else {
-        var rest = 0;
-        for (var i = run.idx + 1; i < run.steps.length; i++) rest += run.steps[i].dur;
-        $('runLeft').textContent = '전체 남은 시간 ' + clock(rest + left);
-      }
+      el.textContent = left >= 60 ? clock(left) : left;
+      el.className = 'clock' + (left >= 60 ? ' long' : '');
+      $('runLeft').textContent = '경과 시간 ' + clock(run.total);
     }
-    var frac = leftMs / (s.dur * 1000);
-    $('ring').style.strokeDashoffset = (RING * (s.open ? 1 : s.up ? frac : 1 - frac)).toFixed(1);
+    $('ring').style.strokeDashoffset = (RING * (1 - leftMs / (s.dur * 1000))).toFixed(1);
   }
 
   function setPaused(p) {
     if (!run || run.paused === p) return;
     var now = Date.now();
     if (p) { credit(now); run.pausedLeft = Math.max(0, run.endsAt - now); letSleep(); }
-    else { run.endsAt = now + run.pausedLeft; run.credited = now; run.nextBeat = 0; keepAwake(); initAudio(); }
+    else { run.endsAt = now + run.pausedLeft; run.credited = now; keepAwake(); initAudio(); }
     run.paused = p;
     $('pauseBtn').textContent = p ? '계속' : '일시정지';
     $('stopBtn').hidden = !p;
@@ -1120,7 +984,7 @@
   // ===== 완료 =====
   var doneRec = null;
 
-  function finish(early) {
+  function finish() {
     if (!run) return;
     if (!run.paused) credit(Math.min(Date.now(), run.endsAt));
     clearInterval(loopId); loopId = null;
@@ -1132,68 +996,28 @@
 
     if (r.total < 1) { show('setup'); return; }
     cueFinish();
-    var open = r.loop || r.steps[r.steps.length - 1].open;
     doneRec = {
       at: Date.now(), mode: r.mode, name: r.name,
-      total: Math.round(r.total), work: Math.round(r.work), rounds: r.rounds,
-      early: early && !open
+      total: Math.round(r.total), work: Math.round(r.work), rounds: r.rounds
     };
-    if (r.mode === 'rope' && r.bpm) doneRec.count = Math.round(r.bpm * r.beatSec / 60);
     doneRec.kcal = kcalOf(doneRec, latestKg());
     log.unshift(doneRec);
     log = log.slice(0, 60);
     save('log', log);
 
-    $('doneTitle').textContent = doneRec.early ? '여기까지 했습니다' : r.name + ' 완료';
-    $('doneInputBlock').hidden = r.mode === 'interval';
-    var input = $('doneInput');
-    if (r.mode === 'rope') {
-      $('doneInputLabel').textContent = '줄넘기 횟수' + (doneRec.count ? ' (박자 기준 추정값, 고칠 수 있습니다)' : ' (세었다면 적어 두세요)');
-      $('doneInputUnit').textContent = '회';
-      input.step = '1'; input.inputMode = 'numeric'; input.placeholder = '예: 500';
-      input.value = doneRec.count || '';
-    } else if (r.mode === 'run') {
-      $('doneInputLabel').textContent = '달린 거리 (적으면 페이스를 계산합니다)';
-      $('doneInputUnit').textContent = 'km';
-      input.step = '0.01'; input.inputMode = 'decimal'; input.placeholder = '예: 5.0';
-      input.value = '';
-    }
-    $('againBtn').textContent = MODES[r.mode].label + ' 다시 하기';
-    renderDone();
+    $('doneTitle').textContent = r.name + ' 완료';
+    var tiles = [[clock(doneRec.total), '전체 시간'], [clock(doneRec.work), '운동 시간'],
+      [String(doneRec.rounds), '완료 라운드'], [doneRec.kcal ? String(doneRec.kcal) : '—', '추정 kcal']];
+    $('doneStats').innerHTML = tiles.map(function (t) { return '<div class="stat"><b>' + t[0] + '</b><span>' + t[1] + '</span></div>'; }).join('');
+    $('doneNote').hidden = !!doneRec.kcal;
     show('done');
   }
 
-  function renderDone() {
-    var r = doneRec, tiles;
-    var kcal = r.kcal ? String(r.kcal) : '—';
-    if (r.mode === 'run') {
-      var pace = '—';
-      if (r.km > 0) { var p = Math.round(r.work / r.km); pace = Math.floor(p / 60) + "'" + String(p % 60).padStart(2, '0') + '"'; }
-      tiles = [[clock(r.work), '러닝 시간'], [r.km > 0 ? String(r.km) : '—', '거리 km'], [pace, '1km 페이스'], [kcal, '추정 kcal']];
-    } else if (r.mode === 'rope') {
-      tiles = [[clock(r.total), '전체 시간'], [clock(r.work), '줄넘기 시간'], [r.count > 0 ? String(r.count) : r.rounds + '세트', r.count > 0 ? '횟수' : '완료 세트'], [kcal, '추정 kcal']];
-    } else {
-      tiles = [[clock(r.total), '전체 시간'], [clock(r.work), '운동 시간'], [String(r.rounds), '완료 라운드'], [kcal, '추정 kcal']];
-    }
-    $('doneStats').innerHTML = tiles.map(function (t) { return '<div class="stat"><b>' + t[0] + '</b><span>' + t[1] + '</span></div>'; }).join('');
-    $('doneNote').hidden = !!r.kcal;
-  }
-
-  $('doneInput').addEventListener('input', function () {
-    if (!doneRec) return;
-    var v = parseFloat(this.value);
-    if (!isFinite(v) || v < 0) v = 0;
-    if (doneRec.mode === 'rope') doneRec.count = Math.min(99999, Math.round(v));
-    else if (doneRec.mode === 'run') { doneRec.km = Math.min(999, Math.round(v * 100) / 100); doneRec.kcal = kcalOf(doneRec, latestKg()); }
-    save('log', log);
-    renderDone();
-  });
-
   $('startBtn').addEventListener('click', startWorkout);
-  $('againBtn').addEventListener('click', function () { mode = doneRec ? doneRec.mode : mode; startWorkout(); });
+  $('againBtn').addEventListener('click', startWorkout);
   $('backBtn').addEventListener('click', function () { show('setup'); });
   $('pauseBtn').addEventListener('click', function () { if (run) setPaused(!run.paused); });
-  $('stopBtn').addEventListener('click', function () { finish(true); });
+  $('stopBtn').addEventListener('click', finish);
 
   document.addEventListener('visibilitychange', function () {
     if (document.visibilityState === 'visible' && run && !run.paused) { keepAwake(); initAudio(); tick(); }
