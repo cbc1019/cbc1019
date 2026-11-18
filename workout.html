@@ -334,6 +334,26 @@
   .log li { align-items: center; }
   .log .right { display: flex; align-items: center; flex: none; }
 
+  /* ===== 식단 ===== */
+  .date-nav { display: flex; align-items: center; gap: 4px; }
+  .date-nav button { width: 40px; height: 40px; border-radius: 10px; background: var(--surface); border: 1px solid var(--line); font-size: 20px; line-height: 1; }
+  .date-nav button:disabled { opacity: 0.35; cursor: default; }
+  .date-nav span { min-width: 108px; text-align: center; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .meter { height: 10px; border-radius: 5px; background: var(--line); overflow: hidden; }
+  .meter > div { height: 100%; border-radius: 5px; background: var(--rest); }
+  .meter.over > div { background: var(--accent); }
+  .field-row select {
+    font: inherit; color: var(--ink);
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 10px 8px;
+    flex: none;
+  }
+  .field-row input.kcal { flex: 0 0 84px; }
+  .meal-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+  .meal-head .num { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
   @media (prefers-reduced-motion: reduce) {
     body, .ring-fg { transition: none; }
   }
@@ -407,6 +427,61 @@
     </div>
   </section>
 
+  <!-- 식단 -->
+  <section class="view tabbed" id="viewDiet" hidden>
+    <div class="head">
+      <h1>식단</h1>
+      <div class="date-nav">
+        <button type="button" id="dPrev" aria-label="전날">‹</button>
+        <span id="dLabel"></span>
+        <button type="button" id="dNext" aria-label="다음 날">›</button>
+      </div>
+    </div>
+
+    <div class="hero">
+      <div class="hero-num" id="dTotal">0<small>kcal 섭취</small></div>
+      <div class="note" id="dGoalLine"></div>
+    </div>
+    <div class="meter" id="dMeter" hidden><div id="dMeterFill"></div></div>
+    <div class="note" id="dBurnLine"></div>
+
+    <div class="block">
+      <h2>먹은 것 추가</h2>
+      <form id="foodForm" class="block">
+        <div class="field-row">
+          <select id="fMeal" aria-label="끼니">
+            <option value="b">아침</option>
+            <option value="l">점심</option>
+            <option value="d">저녁</option>
+            <option value="s">간식</option>
+          </select>
+          <input type="text" id="fName" list="foodList" maxlength="30" placeholder="음식 이름" autocomplete="off" aria-label="음식 이름" required>
+        </div>
+        <div class="field-row">
+          <input type="number" id="fKcal" class="kcal" inputmode="numeric" min="0" max="9999" step="1" placeholder="열량" aria-label="열량 (kcal)" required>
+          <span class="unit">kcal</span>
+          <span style="flex:1"></span>
+          <button type="submit">추가</button>
+        </div>
+        <datalist id="foodList"></datalist>
+      </form>
+      <p class="note">목록에서 고른 음식의 열량은 1인분 기준 대략적인 값입니다. 숫자는 고쳐서 넣을 수 있습니다.</p>
+    </div>
+
+    <div id="dMeals" class="block" style="gap:18px"></div>
+    <p class="empty" id="dEmpty">이 날 기록한 음식이 없습니다.</p>
+
+    <div class="block">
+      <h2 id="gLabel">하루 목표 열량</h2>
+      <form class="field-row" id="goalForm">
+        <input type="number" id="gKcal" inputmode="numeric" min="500" max="9999" step="10" placeholder="예: 2000" aria-labelledby="gLabel" required>
+        <span class="unit">kcal</span>
+        <button type="submit">저장</button>
+      </form>
+      <p class="note" id="gHint"></p>
+    </div>
+  </section>
+
   <!-- 기록 -->
   <section class="view tabbed" id="viewLog" hidden>
     <div class="head"><h1>기록</h1></div>
@@ -466,6 +541,7 @@
 <nav class="tabbar" id="tabbar" aria-label="화면">
   <button type="button" data-tab="weight">체중</button>
   <button type="button" data-tab="setup">운동</button>
+  <button type="button" data-tab="diet">식단</button>
   <button type="button" data-tab="log">기록</button>
 </nav>
 
@@ -791,6 +867,116 @@
     renderWeight();
   });
 
+  // ===== 식단 화면 =====
+  var MEALS = [['b', '아침'], ['l', '점심'], ['d', '저녁'], ['s', '간식']];
+  // 1인분 기준 대략적인 열량 (kcal)
+  var FOODS = [
+    ['쌀밥 1공기', 310], ['잡곡밥 1공기', 300], ['김치찌개 1인분', 240], ['된장찌개 1인분', 150], ['미역국 1그릇', 90],
+    ['비빔밥 1그릇', 590], ['김밥 1줄', 480], ['라면 1봉지', 500], ['떡볶이 1인분', 300], ['짜장면 1그릇', 800],
+    ['짬뽕 1그릇', 700], ['삼겹살 1인분(200g)', 660], ['닭가슴살 100g', 110], ['삶은 달걀 1개', 75], ['계란후라이 1개', 90],
+    ['두부 반 모', 130], ['고구마 1개', 170], ['바나나 1개', 90], ['사과 1개', 130], ['식빵 1장', 100],
+    ['우유 1컵', 130], ['플레인 요거트 1개', 90], ['아메리카노 1잔', 10], ['카페라떼 1잔', 180], ['맥주 500ml', 190], ['소주 1병', 400]
+  ];
+  var meals = load('meals', {});
+  var kcalGoal = Number(load('kcalGoal', 0)) || 0;
+  var dietDate = dateStr(new Date());
+  var autoKcal = '';
+
+  $('foodList').innerHTML = FOODS.map(function (f) { return '<option value="' + f[0] + '"></option>'; }).join('');
+
+  function shiftDate(d, days) {
+    var p = d.split('-'), t = new Date(+p[0], +p[1] - 1, +p[2] + days);
+    return dateStr(t);
+  }
+  function num(n) { return String(Math.round(n)).replace(/\B(?=(\d{3})+$)/g, ','); }
+
+  function renderDiet() {
+    var today = dateStr(new Date());
+    if (dietDate > today) dietDate = today;
+    var p = dietDate.split('-');
+    $('dLabel').textContent = +p[1] + '월 ' + +p[2] + '일' + (dietDate === today ? ' (오늘)' : '');
+    $('dNext').disabled = dietDate >= today;
+
+    var items = meals[dietDate] || [];
+    var total = items.reduce(function (a, it) { return a + it.k; }, 0);
+    $('dTotal').innerHTML = num(total) + '<small>kcal 섭취</small>';
+
+    if (kcalGoal) {
+      var left = kcalGoal - total;
+      $('dGoalLine').textContent = '목표 ' + num(kcalGoal) + 'kcal · ' +
+        (left >= 0 ? num(left) + 'kcal 남았습니다' : num(-left) + 'kcal 넘었습니다');
+      $('dMeter').hidden = false;
+      $('dMeter').className = 'meter' + (left < 0 ? ' over' : '');
+      $('dMeterFill').style.width = Math.min(100, total / kcalGoal * 100) + '%';
+    } else {
+      $('dGoalLine').textContent = '아래에서 하루 목표 열량을 정하면 남은 양을 보여 줍니다.';
+      $('dMeter').hidden = true;
+    }
+
+    var burn = log.reduce(function (a, r) { return a + (dateStr(new Date(r.at)) === dietDate ? (r.kcal || 0) : 0); }, 0);
+    $('dBurnLine').textContent = burn ? '이 날 운동으로 약 ' + num(burn) + 'kcal 소모 · 섭취에서 빼면 ' + num(total - burn) + 'kcal' : '';
+    $('dBurnLine').hidden = !burn;
+
+    $('dMeals').innerHTML = MEALS.map(function (m) {
+      var rows = items.map(function (it, i) { return { it: it, i: i }; }).filter(function (x) { return x.it.m === m[0]; });
+      if (!rows.length) return '';
+      var sub = rows.reduce(function (a, x) { return a + x.it.k; }, 0);
+      return '<div class="block"><div class="meal-head"><h2>' + m[1] + '</h2><span class="num">' + num(sub) + 'kcal</span></div><ul class="log">' +
+        rows.map(function (x) {
+          return '<li><span>' + esc(x.it.n) + '</span><span class="right"><span class="num">' + num(x.it.k) + 'kcal</span>' +
+            '<button type="button" class="del" data-i="' + x.i + '" aria-label="' + esc(x.it.n) + ' 삭제">✕</button></span></li>';
+        }).join('') + '</ul></div>';
+    }).join('');
+    $('dEmpty').hidden = items.length > 0;
+
+    if (kcalGoal && document.activeElement !== $('gKcal')) $('gKcal').value = kcalGoal;
+    var kg = latestKg();
+    $('gHint').textContent = kg
+      ? '참고: 현재 체중 ' + fmtKg(kg) + 'kg 유지에는 보통 하루 ' + num(Math.round(kg * 30 / 50) * 50) + 'kcal 안팎이 필요합니다(체중 × 30, 활동량에 따라 다름). 줄이려면 이보다 300~500kcal 적게 잡습니다.'
+      : '체중을 기록하면 목표를 정할 때 참고할 수치를 보여 줍니다.';
+  }
+
+  function defaultMeal() {
+    var h = new Date().getHours();
+    return h < 10 ? 'b' : h < 15 ? 'l' : h < 21 ? 'd' : 's';
+  }
+
+  $('dPrev').addEventListener('click', function () { dietDate = shiftDate(dietDate, -1); renderDiet(); });
+  $('dNext').addEventListener('click', function () { dietDate = shiftDate(dietDate, 1); renderDiet(); });
+  $('fName').addEventListener('input', function () {
+    var name = this.value.trim(), kcalEl = $('fKcal');
+    var hit = FOODS.filter(function (f) { return f[0] === name; })[0];
+    if (hit && (kcalEl.value === '' || kcalEl.value === autoKcal)) { kcalEl.value = autoKcal = String(hit[1]); }
+  });
+  $('foodForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var name = $('fName').value.trim(), k = Math.round(parseFloat($('fKcal').value));
+    if (!name) { $('fName').focus(); return; }
+    if (!isFinite(k) || k < 0 || k > 9999) { $('fKcal').focus(); return; }
+    (meals[dietDate] = meals[dietDate] || []).push({ m: $('fMeal').value, n: name, k: k });
+    save('meals', meals);
+    $('fName').value = ''; $('fKcal').value = ''; autoKcal = '';
+    $('fKcal').blur();
+    renderDiet();
+  });
+  $('dMeals').addEventListener('click', function (e) {
+    var b = e.target.closest('.del'); if (!b) return;
+    var items = meals[dietDate] || [];
+    items.splice(Number(b.dataset.i), 1);
+    if (!items.length) delete meals[dietDate];
+    save('meals', meals);
+    renderDiet();
+  });
+  $('goalForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var g = Math.round(parseFloat($('gKcal').value));
+    if (!isFinite(g) || g < 500 || g > 9999) { $('gKcal').focus(); return; }
+    kcalGoal = g;
+    save('kcalGoal', g);
+    $('gKcal').blur();
+    renderDiet();
+  });
+
   // ===== 기록 화면 =====
   function recLine(r) {
     var m = r.mode || 'interval';
@@ -876,7 +1062,7 @@
   function letSleep() { if (wakeLock) { try { wakeLock.release(); } catch (e) {} wakeLock = null; } }
 
   // ===== 화면 전환 =====
-  var VIEWS = ['Setup', 'Weight', 'Log', 'Run', 'Done'];
+  var VIEWS = ['Setup', 'Weight', 'Diet', 'Log', 'Run', 'Done'];
   function show(view) {
     VIEWS.forEach(function (v) { $('view' + v).hidden = v.toLowerCase() !== view; });
     document.body.dataset.view = view;
@@ -888,6 +1074,7 @@
     if (view === 'setup') renderSetup();
     if (view === 'weight') renderWeight();
     if (view === 'log') renderLog();
+    if (view === 'diet') { $('fMeal').value = defaultMeal(); renderDiet(); }
     window.scrollTo(0, 0);
   }
   $('tabbar').addEventListener('click', function (e) {
