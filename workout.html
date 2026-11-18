@@ -453,9 +453,7 @@
 
     <div>
       <div class="controls">
-        <button type="button" class="ctl" id="prevBtn" aria-label="이전 구간">이전</button>
         <button type="button" class="ctl main" id="pauseBtn">일시정지</button>
-        <button type="button" class="ctl" id="nextBtn" aria-label="다음 구간">다음</button>
       </div>
       <div class="stop-slot">
         <button type="button" class="stop" id="stopBtn" hidden>운동 끝내기</button>
@@ -979,8 +977,6 @@
     drawLine($('runLine'), steps);
     var solo = mode === 'run';
     $('runLine').classList.toggle('gone', solo || run.loop);
-    $('prevBtn').classList.toggle('gone', solo);
-    $('nextBtn').classList.toggle('gone', solo);
     show('run');
     keepAwake();
     enter(0, Date.now());
@@ -1086,25 +1082,6 @@
     $('ringWrap').classList.toggle('paused', p);
   }
 
-  function jump(dir) {
-    if (!run || run.mode === 'run') return;
-    var now = Date.now();
-    var wasPaused = run.paused;
-    if (!wasPaused) credit(now);
-    var s = run.steps[run.idx];
-    var leftMs = wasPaused ? run.pausedLeft : run.endsAt - now;
-    var target = run.idx + dir;
-    // 구간이 2초 넘게 지났으면 '이전'은 현재 구간을 처음부터 다시 시작
-    if (dir < 0 && (s.dur * 1000 - leftMs > 2000 || run.idx === 0)) target = run.idx;
-    if (target >= run.steps.length) {
-      if (!run.loop) { finish(true); return; }
-      run.lap += 1; target = run.loopStart;
-    }
-    enter(target, now);
-    if (wasPaused) run.pausedLeft = run.steps[target].dur * 1000;
-    renderClock(now);
-  }
-
   // ===== 완료 =====
   var doneRec = null;
 
@@ -1181,8 +1158,6 @@
   $('againBtn').addEventListener('click', function () { mode = doneRec ? doneRec.mode : mode; startWorkout(); });
   $('backBtn').addEventListener('click', function () { show('setup'); });
   $('pauseBtn').addEventListener('click', function () { if (run) setPaused(!run.paused); });
-  $('prevBtn').addEventListener('click', function () { jump(-1); });
-  $('nextBtn').addEventListener('click', function () { jump(1); });
   $('stopBtn').addEventListener('click', function () { finish(true); });
 
   document.addEventListener('visibilitychange', function () {
@@ -1191,8 +1166,6 @@
   document.addEventListener('keydown', function (e) {
     if (!run || e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT') return;
     if (e.code === 'Space') { e.preventDefault(); setPaused(!run.paused); }
-    else if (e.code === 'ArrowRight') jump(1);
-    else if (e.code === 'ArrowLeft') jump(-1);
   });
 
   renderRows();
