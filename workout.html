@@ -25,6 +25,8 @@
     --setrest: #2f6690;
     --cool: #4a56b0;
     --chart: #2f6690;
+    --ok: #00897b;
+    --over: #c93a26;
     --display: "Barlow Condensed", "Arial Narrow", "Apple SD Gothic Neo", sans-serif;
     --body: "IBM Plex Sans KR", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
   }
@@ -39,6 +41,8 @@
       --accent: #e9634b;
       --on-accent: #1a0d0a;
       --chart: #74abd8;
+      --ok: #1fa396;
+      --over: #e9634b;
     }
   }
   :root[data-theme="dark"] {
@@ -51,6 +55,8 @@
     --accent: #e9634b;
     --on-accent: #1a0d0a;
     --chart: #74abd8;
+    --ok: #1fa396;
+    --over: #e9634b;
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -340,8 +346,19 @@
   .date-nav button:disabled { opacity: 0.35; cursor: default; }
   .date-nav span { min-width: 108px; text-align: center; font-weight: 600; font-variant-numeric: tabular-nums; }
   .meter { height: 10px; border-radius: 5px; background: var(--line); overflow: hidden; }
-  .meter > div { height: 100%; border-radius: 5px; background: var(--rest); }
-  .meter.over > div { background: var(--accent); }
+  .meter > div { height: 100%; border-radius: 5px; background: var(--ok); }
+  .meter.over > div { background: var(--over); }
+  .legend { display: flex; gap: 12px; font-size: 12px; color: var(--muted); }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; }
+  .bar { cursor: pointer; }
+  .bar.ok { fill: var(--ok); }
+  .bar.over { fill: var(--over); }
+  .bar.plain { fill: var(--chart); }
+  .goal-line { stroke: var(--ink); stroke-width: 1.5; stroke-dasharray: 5 4; }
+  .chart-wrap text.sel { fill: var(--ink); font-weight: 600; }
+  #dChart text { paint-order: stroke; stroke: var(--surface); stroke-width: 4px; stroke-linejoin: round; }
+  .legend .dash { display: inline-block; width: 16px; border-top: 2px dashed var(--ink); margin-right: 5px; vertical-align: middle; }
+  .legend { flex-wrap: wrap; }
   .field-row select {
     font: inherit; color: var(--ink);
     background: var(--surface);
@@ -445,6 +462,19 @@
     <div class="meter" id="dMeter" hidden><div id="dMeterFill"></div></div>
     <div class="note" id="dBurnLine"></div>
 
+    <div class="card">
+      <div class="card-top">
+        <div class="card-title">7일 섭취 열량</div>
+        <div class="legend" id="dLegend">
+          <span><i style="background:var(--ok)"></i>목표 이내</span>
+          <span><i style="background:var(--over)"></i>목표 초과</span>
+          <span><span class="dash"></span><span id="dGoalKey">목표</span></span>
+        </div>
+      </div>
+      <div class="chart-wrap" id="dChart"></div>
+      <p class="note" id="dWeekLine"></p>
+    </div>
+
     <div class="block">
       <h2>먹은 것 추가</h2>
       <form id="foodForm" class="block">
@@ -472,10 +502,10 @@
     <p class="empty" id="dEmpty">이 날 기록한 음식이 없습니다.</p>
 
     <div class="block">
-      <h2 id="gLabel">하루 목표 열량</h2>
+      <h2 id="gLabel">목표 체중</h2>
       <form class="field-row" id="goalForm">
-        <input type="number" id="gKcal" inputmode="numeric" min="500" max="9999" step="10" placeholder="예: 2000" aria-labelledby="gLabel" required>
-        <span class="unit">kcal</span>
+        <input type="number" id="tKg" inputmode="decimal" min="30" max="200" step="0.1" placeholder="예: 68" aria-labelledby="gLabel" required>
+        <span class="unit">kg</span>
         <button type="submit">저장</button>
       </form>
       <p class="note" id="gHint"></p>
@@ -878,7 +908,7 @@
     ['우유 1컵', 130], ['플레인 요거트 1개', 90], ['아메리카노 1잔', 10], ['카페라떼 1잔', 180], ['맥주 500ml', 190], ['소주 1병', 400]
   ];
   var meals = load('meals', {});
-  var kcalGoal = Number(load('kcalGoal', 0)) || 0;
+  var targetKg = Number(load('targetKg', 0)) || 0;
   var dietDate = dateStr(new Date());
   var autoKcal = '';
 
@@ -889,6 +919,79 @@
     return dateStr(t);
   }
   function num(n) { return String(Math.round(n)).replace(/\B(?=(\d{3})+$)/g, ','); }
+
+  // 하루 목표 열량: 목표 체중 × 30kcal. 현재 체중 유지 열량(체중 × 30)에서 500kcal 넘게 벗어나지 않게 하고 1,200kcal 아래로는 내리지 않는다.
+  function goalInfo() {
+    if (!targetKg) return null;
+    var cur = latestKg(), g = targetKg * 30, capped = false, floor = false;
+    if (cur) {
+      var maint = cur * 30;
+      if (g < maint - 500) { g = maint - 500; capped = true; }
+      if (g > maint + 500) { g = maint + 500; capped = true; }
+    }
+    if (g < 1200) { g = 1200; floor = true; }
+    return { kcal: Math.round(g / 10) * 10, capped: capped, floor: floor, cur: cur };
+  }
+  function dayTotal(d) { return (meals[d] || []).reduce(function (a, it) { return a + it.k; }, 0); }
+
+  var dietBars = [];
+  function drawDietChart(goal) {
+    var box = $('dChart'), today = dateStr(new Date());
+    var end = dietDate < shiftDate(today, -6) ? dietDate : today;
+    var days = [];
+    for (var i = 6; i >= 0; i--) { var d = shiftDate(end, -i); days.push({ d: d, k: dayTotal(d) }); }
+    var W = box.clientWidth || 320, H = 190, L = 8, R = 8, T = 30, B = 26;
+    var top = Math.max(goal || 0, Math.max.apply(null, days.map(function (x) { return x.k; })), 100) * 1.12;
+    var Y = function (k) { return T + (1 - k / top) * (H - T - B); };
+    var slot = (W - L - R) / 7, bw = Math.min(30, slot * 0.56);
+    var h = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="최근 7일 섭취 열량 막대 그래프. 아래 요약에 같은 내용이 있습니다.">' +
+      '<line class="grid-line" x1="' + L + '" x2="' + (W - R) + '" y1="' + (H - B) + '" y2="' + (H - B) + '"></line>';
+    var labels = '';
+    dietBars = days.map(function (x, i) {
+      var cx = L + slot * (i + 0.5), y = Y(x.k), bh = H - B - y;
+      var cls = !goal ? 'plain' : x.k > goal ? 'over' : 'ok';
+      if (x.k > 0) {
+        var r = Math.min(4, bh);
+        h += '<path class="bar ' + cls + '" d="M' + (cx - bw / 2) + ' ' + (H - B) + ' V' + (y + r) + ' Q' + (cx - bw / 2) + ' ' + y + ' ' + (cx - bw / 2 + r) + ' ' + y +
+          ' H' + (cx + bw / 2 - r) + ' Q' + (cx + bw / 2) + ' ' + y + ' ' + (cx + bw / 2) + ' ' + (y + r) + ' V' + (H - B) + ' Z"></path>';
+        labels += '<text x="' + cx + '" y="' + (y - 5) + '" text-anchor="middle">' + num(x.k) + '</text>';
+      }
+      var p = x.d.split('-');
+      h += '<text' + (x.d === dietDate ? ' class="sel"' : '') + ' x="' + cx + '" y="' + (H - 8) + '" text-anchor="middle">' + (x.d === today ? '오늘' : +p[1] + '/' + +p[2]) + '</text>';
+      return { x0: cx - slot / 2, x1: cx + slot / 2, cx: cx, d: x.d, k: x.k };
+    });
+    if (goal) h += '<line class="goal-line" x1="' + L + '" x2="' + (W - R) + '" y1="' + Y(goal) + '" y2="' + Y(goal) + '"></line>';
+    box.innerHTML = h + labels + '</svg><div class="tip" id="dTip" hidden></div>';
+
+    $('dLegend').hidden = !goal;
+    if (goal) $('dGoalKey').textContent = '목표 ' + num(goal);
+    var logged = days.filter(function (x) { return x.k > 0; });
+    if (!goal) $('dWeekLine').textContent = '아래에서 목표 체중을 저장하면 날마다 목표 이내인지 초과인지 색으로 보여 줍니다.';
+    else if (!logged.length) $('dWeekLine').textContent = '이 7일 동안 기록한 식단이 없습니다.';
+    else {
+      var over = logged.filter(function (x) { return x.k > goal; }).length;
+      $('dWeekLine').textContent = '기록한 ' + logged.length + '일 중 목표 이내 ' + (logged.length - over) + '일 · 초과 ' + over + '일';
+    }
+  }
+  function dietBarAt(ev) {
+    var x = ev.clientX - $('dChart').getBoundingClientRect().left;
+    return dietBars.filter(function (b) { return x >= b.x0 && x < b.x1; })[0];
+  }
+  $('dChart').addEventListener('pointermove', function (ev) {
+    var b = dietBarAt(ev), tip = $('dTip'); if (!b || !tip) return;
+    var g = goalInfo(), p = b.d.split('-');
+    tip.textContent = +p[1] + '/' + +p[2] + ' · ' + (b.k ? num(b.k) + 'kcal' : '기록 없음') +
+      (g && b.k ? (b.k > g.kcal ? ' · ' + num(b.k - g.kcal) + ' 초과' : ' · 목표 이내') : '');
+    tip.hidden = false;
+    tip.style.left = Math.max(0, Math.min($('dChart').clientWidth - tip.offsetWidth, b.cx - tip.offsetWidth / 2)) + 'px';
+  });
+  $('dChart').addEventListener('pointerleave', function () { if ($('dTip')) $('dTip').hidden = true; });
+  $('dChart').addEventListener('click', function (ev) {
+    var b = dietBarAt(ev); if (!b) return;
+    dietDate = b.d;
+    renderDiet();
+  });
+  window.addEventListener('resize', function () { if (!$('viewDiet').hidden) renderDiet(); });
 
   function renderDiet() {
     var today = dateStr(new Date());
@@ -901,17 +1004,19 @@
     var total = items.reduce(function (a, it) { return a + it.k; }, 0);
     $('dTotal').innerHTML = num(total) + '<small>kcal 섭취</small>';
 
-    if (kcalGoal) {
-      var left = kcalGoal - total;
-      $('dGoalLine').textContent = '목표 ' + num(kcalGoal) + 'kcal · ' +
-        (left >= 0 ? num(left) + 'kcal 남았습니다' : num(-left) + 'kcal 넘었습니다');
+    var gi = goalInfo(), goal = gi ? gi.kcal : 0;
+    if (goal) {
+      var left = goal - total;
+      $('dGoalLine').textContent = '목표 ' + num(goal) + 'kcal · ' +
+        (!total ? '아직 기록이 없습니다' : left >= 0 ? '목표 이내 (' + num(left) + 'kcal 남음)' : '목표 초과 (' + num(-left) + 'kcal 넘음)');
       $('dMeter').hidden = false;
       $('dMeter').className = 'meter' + (left < 0 ? ' over' : '');
-      $('dMeterFill').style.width = Math.min(100, total / kcalGoal * 100) + '%';
+      $('dMeterFill').style.width = Math.min(100, total / goal * 100) + '%';
     } else {
-      $('dGoalLine').textContent = '아래에서 하루 목표 열량을 정하면 남은 양을 보여 줍니다.';
+      $('dGoalLine').textContent = '아래에서 목표 체중을 저장하면 하루 목표 열량을 정해 줍니다.';
       $('dMeter').hidden = true;
     }
+    drawDietChart(goal);
 
     var burn = log.reduce(function (a, r) { return a + (dateStr(new Date(r.at)) === dietDate ? (r.kcal || 0) : 0); }, 0);
     $('dBurnLine').textContent = burn ? '이 날 운동으로 약 ' + num(burn) + 'kcal 소모 · 섭취에서 빼면 ' + num(total - burn) + 'kcal' : '';
@@ -929,11 +1034,21 @@
     }).join('');
     $('dEmpty').hidden = items.length > 0;
 
-    if (kcalGoal && document.activeElement !== $('gKcal')) $('gKcal').value = kcalGoal;
-    var kg = latestKg();
-    $('gHint').textContent = kg
-      ? '참고: 현재 체중 ' + fmtKg(kg) + 'kg 유지에는 보통 하루 ' + num(Math.round(kg * 30 / 50) * 50) + 'kcal 안팎이 필요합니다(체중 × 30, 활동량에 따라 다름). 줄이려면 이보다 300~500kcal 적게 잡습니다.'
-      : '체중을 기록하면 목표를 정할 때 참고할 수치를 보여 줍니다.';
+    if (targetKg && document.activeElement !== $('tKg')) $('tKg').value = targetKg;
+    var hint;
+    if (!gi) hint = '목표 체중을 저장하면 "목표 체중 × 30kcal"로 하루 목표 열량을 정합니다.';
+    else {
+      hint = '하루 목표 ' + num(goal) + 'kcal. ';
+      if (gi.capped) hint += '목표 체중 기준으로는 ' + num(targetKg * 30) + 'kcal이지만, 무리가 되지 않게 현재 체중 유지 열량(' + num(gi.cur * 30) + 'kcal)에서 500kcal까지만 조정했습니다. ';
+      else if (gi.floor) hint += '하루 1,200kcal 아래로는 잡지 않습니다. ';
+      else hint += '목표 체중 ' + fmtKg(targetKg) + 'kg × 30kcal로 계산했습니다. ';
+      if (gi.cur) {
+        var diff = Math.round((targetKg - gi.cur) * 10) / 10;
+        hint += diff === 0 ? '현재 체중이 목표와 같습니다. ' : '현재 ' + fmtKg(gi.cur) + 'kg에서 ' + Math.abs(diff).toFixed(1) + 'kg ' + (diff < 0 ? '감량' : '증량') + '이 목표입니다. ';
+      } else hint += '체중 탭에서 현재 체중을 기록하면 더 맞게 조정합니다. ';
+      hint += '나이·성별·활동량은 반영하지 않은 어림값입니다.';
+    }
+    $('gHint').textContent = hint;
   }
 
   function defaultMeal() {
@@ -969,11 +1084,11 @@
   });
   $('goalForm').addEventListener('submit', function (e) {
     e.preventDefault();
-    var g = Math.round(parseFloat($('gKcal').value));
-    if (!isFinite(g) || g < 500 || g > 9999) { $('gKcal').focus(); return; }
-    kcalGoal = g;
-    save('kcalGoal', g);
-    $('gKcal').blur();
+    var t = Math.round(parseFloat($('tKg').value) * 10) / 10;
+    if (!isFinite(t) || t < 30 || t > 200) { $('tKg').focus(); return; }
+    targetKg = t;
+    save('targetKg', t);
+    $('tKg').blur();
     renderDiet();
   });
 
