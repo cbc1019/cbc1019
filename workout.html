@@ -358,7 +358,7 @@
     </div>
 
     <div class="modes" id="modes">
-      <button type="button" data-mode="interval">타바타</button>
+      <button type="button" data-mode="interval">버피테스트</button>
       <button type="button" data-mode="rope">줄넘기</button>
       <button type="button" data-mode="run">러닝</button>
     </div>
@@ -515,7 +515,7 @@
   // ===== 모드별 설정 항목 =====
   var MODES = {
     interval: {
-      label: '타바타',
+      label: '버피테스트',
       def: { prep: 10, work: 30, rest: 10 },
       fields: [
         { k: 'prep', label: '준비', min: 0, max: 60,  step: 5, phase: 'prep', fmt: clock, zero: '없음' },
@@ -608,7 +608,7 @@
     var steps = [], s;
     if (c.prep > 0) steps.push({ type: 'prep', label: '준비', dur: c.prep, pos: '' });
     if (m === 'interval') {
-      // 타바타는 끝낼 때까지 운동·휴식을 반복한다 (타이머가 마지막 구간에서 처음 운동으로 되돌아간다).
+      // 버피테스트는 끝낼 때까지 운동·휴식을 반복한다 (타이머가 마지막 구간에서 처음 운동으로 되돌아간다).
       steps.push({ type: 'work', label: '운동', dur: c.work, pos: '' });
       if (c.rest > 0) steps.push({ type: 'rest', label: '휴식', dur: c.rest, pos: '' });
     } else if (m === 'rope') {
