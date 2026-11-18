@@ -358,14 +358,9 @@
     </div>
 
     <div class="modes" id="modes">
-      <button type="button" data-mode="interval">인터벌</button>
+      <button type="button" data-mode="interval">타바타</button>
       <button type="button" data-mode="rope">줄넘기</button>
       <button type="button" data-mode="run">러닝</button>
-    </div>
-
-    <div class="block" id="presetBlock">
-      <h2>루틴</h2>
-      <div class="chips" id="presets"></div>
     </div>
 
     <div class="rows" id="rows"></div>
@@ -379,13 +374,6 @@
       <button type="button" class="primary" id="startBtn">운동 시작</button>
     </div>
 
-    <div class="block" id="saveBlock">
-      <h2>지금 설정을 내 루틴으로 저장</h2>
-      <form class="save-row" id="saveForm">
-        <input type="text" id="presetName" maxlength="12" placeholder="루틴 이름" autocomplete="off" aria-label="루틴 이름">
-        <button type="submit">저장</button>
-      </form>
-    </div>
   </section>
 
   <!-- 체중 -->
@@ -527,17 +515,12 @@
   // ===== 모드별 설정 항목 =====
   var MODES = {
     interval: {
-      label: '인터벌',
-      def: { prep: 10, work: 20, rest: 10, rounds: 8, sets: 1, setRest: 60, cool: 0 },
+      label: '타바타',
+      def: { prep: 10, work: 30, rest: 10 },
       fields: [
-        { k: 'prep',    label: '준비',           min: 0, max: 300,  step: 5, phase: 'prep',    fmt: clock, zero: '없음' },
-        { k: 'work',    label: '운동',           min: 5, max: 1800, step: 5, phase: 'work',    fmt: clock },
-        { k: 'rest',    label: '휴식',           min: 0, max: 1800, step: 5, phase: 'rest',    fmt: clock, zero: '없음' },
-        { k: 'rounds',  label: '라운드',         min: 1, max: 50,   step: 1, fmt: function (v) { return v + '회'; } },
-        { k: 'sets',    label: '세트',           min: 1, max: 10,   step: 1, fmt: function (v) { return v + '세트'; } },
-        { k: 'setRest', label: '세트 사이 휴식', min: 0, max: 1800, step: 5, phase: 'setrest', fmt: clock, zero: '없음',
-          showIf: function (c) { return c.sets > 1; } },
-        { k: 'cool',    label: '마무리 운동',    min: 0, max: 1800, step: 5, phase: 'cool',    fmt: clock, zero: '없음' }
+        { k: 'prep', label: '준비', min: 0, max: 60,  step: 5, phase: 'prep', fmt: clock, zero: '없음' },
+        { k: 'work', label: '운동', min: 5, max: 600, step: 5, phase: 'work', fmt: clock },
+        { k: 'rest', label: '휴식', min: 0, max: 600, step: 5, phase: 'rest', fmt: clock, zero: '없음' }
       ]
     },
     rope: {
@@ -566,13 +549,6 @@
   };
   var MODE_KEYS = ['interval', 'rope', 'run'];
 
-  var BUILTIN = [
-    { name: '타바타',      cfg: { prep: 10, work: 20, rest: 10, rounds: 8,  sets: 1, setRest: 60, cool: 0 } },
-    { name: 'HIIT 30/30',  cfg: { prep: 10, work: 30, rest: 30, rounds: 10, sets: 1, setRest: 60, cool: 0 } },
-    { name: '서킷 3세트',  cfg: { prep: 10, work: 40, rest: 20, rounds: 5,  sets: 3, setRest: 90, cool: 0 } },
-    { name: '러닝 인터벌', cfg: { prep: 10, work: 60, rest: 120, rounds: 6, sets: 1, setRest: 60, cool: 300 } }
-  ];
-
   // ===== 저장소 (없어도 동작) =====
   function load(key, fallback) {
     try { var v = localStorage.getItem('intervalTrainer.' + key); return v ? JSON.parse(v) : fallback; }
@@ -600,12 +576,11 @@
     return out;
   }
 
-  var savedCfgs = load('cfgs', null) || { interval: load('cfg', null) };
+  var savedCfgs = load('cfgs2', null) || {};
   var cfgs = {};
   MODE_KEYS.forEach(function (m) { cfgs[m] = sanitize(m, savedCfgs[m] || MODES[m].def); });
   var mode = load('mode', 'interval');
   if (!MODES[mode]) mode = 'interval';
-  var myPresets = load('presets', []);
   var log = load('log', []);
   var soundOn = load('sound', true);
   var weights = loadWeights();
@@ -630,18 +605,12 @@
 
   // ===== 구간 목록 만들기 =====
   function buildSteps(m, c) {
-    var steps = [], s, r;
+    var steps = [], s;
     if (c.prep > 0) steps.push({ type: 'prep', label: '준비', dur: c.prep, pos: '' });
     if (m === 'interval') {
-      for (s = 1; s <= c.sets; s++) {
-        for (r = 1; r <= c.rounds; r++) {
-          var pos = (c.sets > 1 ? '세트 ' + s + '/' + c.sets + ' · ' : '') + '라운드 ' + r + '/' + c.rounds;
-          steps.push({ type: 'work', label: '운동', dur: c.work, pos: pos });
-          if (r < c.rounds && c.rest > 0) steps.push({ type: 'rest', label: '휴식', dur: c.rest, pos: pos });
-        }
-        if (s < c.sets && c.setRest > 0) steps.push({ type: 'setrest', label: '세트 휴식', dur: c.setRest, pos: '세트 ' + s + '/' + c.sets + ' 끝' });
-      }
-      if (c.cool > 0) steps.push({ type: 'cool', label: '마무리 운동', dur: c.cool, pos: '' });
+      // 타바타는 끝낼 때까지 운동·휴식을 반복한다 (타이머가 마지막 구간에서 처음 운동으로 되돌아간다).
+      steps.push({ type: 'work', label: '운동', dur: c.work, pos: '' });
+      if (c.rest > 0) steps.push({ type: 'rest', label: '휴식', dur: c.rest, pos: '' });
     } else if (m === 'rope') {
       for (s = 1; s <= c.sets; s++) {
         steps.push({ type: 'work', label: '줄넘기', dur: c.work, pos: '세트 ' + s + '/' + c.sets });
@@ -660,18 +629,6 @@
     el.innerHTML = steps.map(function (s) {
       return '<div class="seg ' + s.type + '" style="flex-grow:' + s.dur + '"></div>';
     }).join('');
-  }
-
-  function sameCfg(a, b) {
-    return MODES.interval.fields.every(function (f) {
-      if (f.k === 'setRest' && a.sets === 1 && b.sets === 1) return true;
-      return a[f.k] === b[f.k];
-    });
-  }
-  function presetName() {
-    var all = BUILTIN.concat(myPresets);
-    for (var i = 0; i < all.length; i++) if (sameCfg(all[i].cfg, cfgs.interval)) return all[i].name;
-    return null;
   }
 
   // ===== 운동 설정 화면 =====
@@ -703,8 +660,8 @@
     var steps = buildSteps(mode, c);
     var total, sub;
     if (mode === 'interval') {
-      total = clock(totalOf(steps));
-      sub = '운동 ' + words(c.work * c.rounds * c.sets) + ' · ' + (c.sets > 1 ? c.sets + '세트 × ' : '') + c.rounds + '라운드';
+      total = clock(c.work + c.rest);
+      sub = '한 라운드 · 끝낼 때까지 반복합니다';
     } else if (mode === 'rope') {
       total = clock(totalOf(steps));
       sub = '줄넘기 ' + words(c.work * c.sets) + (c.bpm ? ' · 약 ' + Math.round(c.bpm * c.work * c.sets / 60) + '회' : ' · ' + c.sets + '세트');
@@ -718,16 +675,6 @@
     drawLine($('planLine'), steps);
     $('startBtn').textContent = MODES[mode].label + ' 시작';
 
-    $('presetBlock').hidden = $('saveBlock').hidden = mode !== 'interval';
-    var name = presetName();
-    $('presets').innerHTML = BUILTIN.concat(myPresets).map(function (p, i) {
-      var mine = i >= BUILTIN.length;
-      return '<span class="chip' + (p.name === name ? ' on' : '') + '">' +
-        '<button type="button" data-i="' + i + '">' + esc(p.name) + '</button>' +
-        (mine ? '<button type="button" class="del" data-del="' + (i - BUILTIN.length) + '" aria-label="' + esc(p.name) + ' 삭제">✕</button>' : '') +
-        '</span>';
-    }).join('');
-
     $('soundBtn').textContent = soundOn ? '소리 켜짐' : '소리 꺼짐';
     $('soundBtn').setAttribute('aria-pressed', String(soundOn));
   }
@@ -737,7 +684,7 @@
     var c = cfgs[mode], v = c[k] + dir * f.step;
     if (f.floor && v > 0 && v < f.floor) v = dir > 0 ? f.floor : 0;
     c[k] = Math.max(f.min, Math.min(f.max, v));
-    save('cfgs', cfgs);
+    save('cfgs2', cfgs);
     renderSetup();
   }
 
@@ -767,32 +714,6 @@
     mode = b.dataset.mode;
     save('mode', mode);
     renderRows();
-    renderSetup();
-  });
-
-  $('presets').addEventListener('click', function (e) {
-    var b = e.target.closest('button'); if (!b) return;
-    if (b.dataset.del !== undefined) {
-      myPresets.splice(Number(b.dataset.del), 1);
-      save('presets', myPresets);
-    } else {
-      cfgs.interval = sanitize('interval', BUILTIN.concat(myPresets)[Number(b.dataset.i)].cfg);
-      save('cfgs', cfgs);
-    }
-    renderSetup();
-  });
-
-  $('saveForm').addEventListener('submit', function (e) {
-    e.preventDefault();
-    var input = $('presetName');
-    var name = input.value.trim();
-    if (!name) { input.focus(); return; }
-    myPresets = myPresets.filter(function (p) { return p.name !== name; });
-    myPresets.push({ name: name, cfg: sanitize('interval', cfgs.interval) });
-    if (myPresets.length > 8) myPresets.shift();
-    save('presets', myPresets);
-    input.value = '';
-    input.blur();
     renderSetup();
   });
 
@@ -936,7 +857,7 @@
   // ===== 기록 화면 =====
   function recLine(r) {
     var m = r.mode || 'interval';
-    var title = m === 'interval' ? (r.name && r.name !== '직접 설정' ? r.name : '인터벌') : MODES[m].label;
+    var title = MODES[m].label;
     var bits = [clock(m === 'run' ? r.work : r.total)];
     if (m === 'interval') bits.push(r.rounds + '라운드');
     if (m === 'rope') bits.push(r.count > 0 ? r.count + '회' : r.rounds + '세트');
@@ -1049,14 +970,15 @@
     var steps = buildSteps(mode, c);
     run = {
       mode: mode, steps: steps,
-      name: mode === 'interval' ? (presetName() || '인터벌') : MODES[mode].label,
+      name: MODES[mode].label,
+      loop: mode === 'interval', loopStart: c.prep > 0 ? 1 : 0, lap: 0,
       bpm: mode === 'rope' ? c.bpm : 0, alert: mode === 'run' ? c.alert : 0,
       idx: 0, endsAt: 0, credited: 0, paused: false, pausedLeft: 0, nextBeat: 0,
       total: 0, work: 0, rounds: 0, beatSec: 0, lastSec: -1
     };
     drawLine($('runLine'), steps);
     var solo = mode === 'run';
-    $('runLine').classList.toggle('gone', solo);
+    $('runLine').classList.toggle('gone', solo || run.loop);
     $('prevBtn').classList.toggle('gone', solo);
     $('nextBtn').classList.toggle('gone', solo);
     show('run');
@@ -1091,8 +1013,9 @@
       var end = run.endsAt;
       credit(end);
       if (run.steps[run.idx].type === 'work') run.rounds += 1;
-      if (run.idx + 1 >= run.steps.length) { finish(false); return; }
-      enter(run.idx + 1, end);
+      if (run.idx + 1 < run.steps.length) enter(run.idx + 1, end);
+      else if (run.loop) { run.lap += 1; enter(run.loopStart, end); }
+      else { finish(false); return; }
     }
     credit(now);
     beat(now);
@@ -1113,10 +1036,10 @@
   }
 
   function renderStep() {
-    var s = run.steps[run.idx], n = run.steps[run.idx + 1];
+    var s = run.steps[run.idx], n = run.steps[run.idx + 1] || (run.loop ? run.steps[run.loopStart] : null);
     document.body.dataset.phase = s.type;
     $('phaseName').textContent = s.label;
-    $('runPos').textContent = s.pos || ' ';
+    $('runPos').textContent = (run.loop && s.type !== 'prep' ? '라운드 ' + (run.lap + 1) : s.pos) || ' ';
     if (run.mode === 'run') $('runNext').textContent = s.up ? (run.alert ? run.alert / 60 + '분마다 알림' : ' ') : '곧 러닝 시작';
     else $('runNext').textContent = n ? '다음 ' + n.label + ' ' + words(n.dur) : '마지막 구간';
     var segs = $('runLine').children;
@@ -1140,6 +1063,7 @@
       el.textContent = (s.up || shown >= 60) ? clock(shown) : shown;
       el.className = 'clock' + (shown >= 3600 ? ' xlong' : (s.up || shown >= 60) ? ' long' : '');
       if (s.open) $('runLeft').textContent = ' ';
+      else if (run.loop) $('runLeft').textContent = '경과 시간 ' + clock(run.total);
       else if (run.mode === 'run') $('runLeft').textContent = s.up ? '남은 시간 ' + clock(left) : ' ';
       else {
         var rest = 0;
@@ -1172,7 +1096,10 @@
     var target = run.idx + dir;
     // 구간이 2초 넘게 지났으면 '이전'은 현재 구간을 처음부터 다시 시작
     if (dir < 0 && (s.dur * 1000 - leftMs > 2000 || run.idx === 0)) target = run.idx;
-    if (target >= run.steps.length) { finish(true); return; }
+    if (target >= run.steps.length) {
+      if (!run.loop) { finish(true); return; }
+      run.lap += 1; target = run.loopStart;
+    }
     enter(target, now);
     if (wasPaused) run.pausedLeft = run.steps[target].dur * 1000;
     renderClock(now);
@@ -1193,7 +1120,7 @@
 
     if (r.total < 1) { show('setup'); return; }
     cueFinish();
-    var open = r.steps[r.steps.length - 1].open;
+    var open = r.loop || r.steps[r.steps.length - 1].open;
     doneRec = {
       at: Date.now(), mode: r.mode, name: r.name,
       total: Math.round(r.total), work: Math.round(r.work), rounds: r.rounds,
