@@ -392,6 +392,20 @@
       <button type="button" class="primary" id="startBtn">버피테스트 시작</button>
     </div>
 
+
+    <div class="block">
+      <h2>최근 7일</h2>
+      <div class="stats three">
+        <div class="stat"><b id="wkCount">0</b><span>운동 횟수</span></div>
+        <div class="stat"><b id="wkTime">0:00</b><span>운동한 시간</span></div>
+        <div class="stat"><b id="wkKcal">—</b><span>추정 kcal</span></div>
+      </div>
+    </div>
+    <div class="block">
+      <h2>운동 기록</h2>
+      <ul class="log" id="log"></ul>
+      <p class="empty" id="logEmpty">아직 기록이 없습니다. 운동을 마치면 여기에 쌓입니다.</p>
+    </div>
   </section>
 
   <!-- 체중 -->
@@ -512,24 +526,6 @@
     </div>
   </section>
 
-  <!-- 기록 -->
-  <section class="view tabbed" id="viewLog" hidden>
-    <div class="head"><h1>기록</h1></div>
-    <div class="block">
-      <h2>최근 7일</h2>
-      <div class="stats three">
-        <div class="stat"><b id="wkCount">0</b><span>운동 횟수</span></div>
-        <div class="stat"><b id="wkTime">0:00</b><span>운동한 시간</span></div>
-        <div class="stat"><b id="wkKcal">—</b><span>추정 kcal</span></div>
-      </div>
-    </div>
-    <div class="block">
-      <h2>운동 기록</h2>
-      <ul class="log" id="log"></ul>
-      <p class="empty" id="logEmpty">아직 기록이 없습니다. 운동을 마치면 여기에 쌓입니다.</p>
-    </div>
-  </section>
-
   <!-- 운동 중 -->
   <section class="view" id="viewRun" hidden>
     <div class="run-top">
@@ -572,7 +568,6 @@
   <button type="button" data-tab="weight">체중</button>
   <button type="button" data-tab="setup">운동</button>
   <button type="button" data-tab="diet">식단</button>
-  <button type="button" data-tab="log">기록</button>
 </nav>
 
 <script>
@@ -1177,7 +1172,7 @@
   function letSleep() { if (wakeLock) { try { wakeLock.release(); } catch (e) {} wakeLock = null; } }
 
   // ===== 화면 전환 =====
-  var VIEWS = ['Setup', 'Weight', 'Diet', 'Log', 'Run', 'Done'];
+  var VIEWS = ['Setup', 'Weight', 'Diet', 'Run', 'Done'];
   function show(view) {
     VIEWS.forEach(function (v) { $('view' + v).hidden = v.toLowerCase() !== view; });
     document.body.dataset.view = view;
@@ -1186,9 +1181,8 @@
     Array.prototype.forEach.call($('tabbar').children, function (b) {
       if (b.dataset.tab === view) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
     });
-    if (view === 'setup') renderSetup();
+    if (view === 'setup') { renderSetup(); renderLog(); }
     if (view === 'weight') renderWeight();
-    if (view === 'log') renderLog();
     if (view === 'diet') { $('fMeal').value = defaultMeal(); renderDiet(); }
     window.scrollTo(0, 0);
   }
