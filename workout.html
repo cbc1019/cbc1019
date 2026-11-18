@@ -427,17 +427,11 @@
     </form>
 
     <div class="block">
-      <h2 id="hLabel">키</h2>
-      <form class="field-row" id="heightForm">
-        <input type="number" id="hCm" inputmode="decimal" step="0.1" min="100" max="250" placeholder="예: 170" aria-labelledby="hLabel" required>
-        <span class="unit">cm</span>
-        <button type="submit">저장</button>
-      </form>
       <div class="stats" id="bmiStats" hidden>
         <div class="stat"><b id="bmiNum">—</b><span id="bmiLabel">BMI</span></div>
         <div class="stat"><b id="bmiRange">—</b><span>정상 체중 범위 kg</span></div>
       </div>
-      <p class="note" id="bmiNote">키와 체중을 모두 기록하면 BMI를 계산합니다.</p>
+      <p class="note" id="bmiNote">설정 탭에 키를 저장하고 체중을 기록하면 BMI를 계산합니다.</p>
     </div>
 
     <div class="card">
@@ -517,13 +511,23 @@
     <div id="dMeals" class="block" style="gap:18px"></div>
     <p class="empty" id="dEmpty">이 날 기록한 음식이 없습니다.</p>
 
+  </section>
+
+  <!-- 설정 -->
+  <section class="view tabbed" id="viewSettings" hidden>
+    <div class="head"><h1>설정</h1></div>
     <div class="block">
       <h2>목표와 내 정보</h2>
       <form class="block" id="goalForm">
         <div class="field-row">
           <label for="tKg">목표 체중</label>
-          <input type="number" id="tKg" inputmode="decimal" min="30" max="200" step="0.1" placeholder="예: 68" required>
+          <input type="number" id="tKg" inputmode="decimal" min="30" max="200" step="0.1" placeholder="예: 68">
           <span class="unit">kg</span>
+        </div>
+        <div class="field-row">
+          <label for="hCm">키</label>
+          <input type="number" id="hCm" inputmode="decimal" step="0.1" min="100" max="250" placeholder="예: 170">
+          <span class="unit">cm</span>
         </div>
         <div class="field-row">
           <label for="pAge">나이</label>
@@ -551,6 +555,7 @@
         </div>
         <div class="field-row"><span style="flex:1"></span><button type="submit">저장</button></div>
       </form>
+      <p class="note" id="gSaved" hidden>저장했습니다.</p>
       <p class="note" id="gHint"></p>
     </div>
   </section>
@@ -597,6 +602,7 @@
   <button type="button" data-tab="weight">체중</button>
   <button type="button" data-tab="setup">운동</button>
   <button type="button" data-tab="diet">식단</button>
+  <button type="button" data-tab="settings">설정</button>
 </nav>
 
 <script>
@@ -789,7 +795,6 @@
     if (last) $('wKg').placeholder = fmtKg(last.kg);
 
     // BMI (대한비만학회 기준: 18.5 미만 저체중, 23 미만 정상, 25 미만 비만 전단계, 그 이상 비만)
-    if (heightCm && document.activeElement !== $('hCm')) $('hCm').value = heightCm;
     var hasBmi = !!(heightCm && last);
     $('bmiStats').hidden = !hasBmi;
     $('bmiNote').hidden = hasBmi;
@@ -904,15 +909,6 @@
     $('wKg').blur();
     renderWeight();
   });
-  $('heightForm').addEventListener('submit', function (e) {
-    e.preventDefault();
-    var h = Math.round(parseFloat($('hCm').value) * 10) / 10;
-    if (!isFinite(h) || h < 100 || h > 250) { $('hCm').focus(); return; }
-    heightCm = h;
-    save('height', h);
-    $('hCm').blur();
-    renderWeight();
-  });
   $('wList').addEventListener('click', function (e) {
     var b = e.target.closest('.del'); if (!b) return;
     weights = loadWeights();
@@ -954,7 +950,7 @@
     var act = Number(profile.act) || 0, age = Number(profile.age) || 0, sex = profile.sex;
     var missing = [];
     if (!cur) missing.push('현재 체중(체중 탭)');
-    if (!heightCm) missing.push('키(체중 탭)');
+    if (!heightCm) missing.push('키');
     if (!age) missing.push('나이');
     if (sex !== 'm' && sex !== 'f') missing.push('성별');
     if (!act) missing.push('활동량');
@@ -1005,7 +1001,7 @@
     $('dLegend').hidden = !goal;
     if (goal) $('dGoalKey').textContent = '목표 ' + num(goal);
     var logged = days.filter(function (x) { return x.k > 0; });
-    if (!goal) $('dWeekLine').textContent = '아래에서 목표 체중을 저장하면 날마다 목표 이내인지 초과인지 색으로 보여 줍니다.';
+    if (!goal) $('dWeekLine').textContent = '설정 탭에서 목표 체중을 저장하면 날마다 목표 이내인지 초과인지 색으로 보여 줍니다.';
     else if (!logged.length) $('dWeekLine').textContent = '이 7일 동안 기록한 식단이 없습니다.';
     else {
       var over = logged.filter(function (x) { return x.k > goal; }).length;
@@ -1052,7 +1048,7 @@
       $('dMeter').className = 'meter' + (left < 0 ? ' over' : '');
       $('dMeterFill').style.width = Math.min(100, total / goal * 100) + '%';
     } else {
-      $('dGoalLine').textContent = '아래에서 목표 체중을 저장하면 하루 목표 열량을 정해 줍니다.';
+      $('dGoalLine').textContent = '설정 탭에서 목표 체중을 저장하면 하루 목표 열량을 정해 줍니다.';
       $('dMeter').hidden = true;
     }
     drawDietChart(goal);
@@ -1073,12 +1069,18 @@
     }).join('');
     $('dEmpty').hidden = items.length > 0;
 
+  }
+
+  // ===== 설정 화면 =====
+  function renderSettings() {
+    var gi = goalInfo(), goal = gi ? gi.kcal : 0;
+    if (heightCm) $('hCm').value = heightCm;
     if (targetKg && document.activeElement !== $('tKg')) $('tKg').value = targetKg;
     if (profile.age && document.activeElement !== $('pAge')) $('pAge').value = profile.age;
     $('pSex').value = profile.sex || '';
     $('pAct').value = profile.act ? String(profile.act) : '';
     var hint;
-    if (!gi) hint = '목표 체중과 내 정보를 저장하면 하루 목표 열량을 계산합니다. 키와 현재 체중은 체중 탭에서 입력합니다.';
+    if (!gi) hint = '목표 체중과 내 정보를 저장하면 하루 목표 열량을 계산합니다. 현재 체중은 체중 탭에서 기록합니다.';
     else {
       hint = '하루 목표 ' + num(goal) + 'kcal. ';
       if (gi.full) hint += '나이·성별·키·활동량으로 계산한 값입니다. 현재 체중 유지에는 하루 약 ' + num(gi.maint) + 'kcal, 목표 체중 ' + fmtKg(targetKg) + 'kg 유지에는 약 ' + num(gi.raw) + 'kcal가 필요합니다. ';
@@ -1126,16 +1128,22 @@
   });
   $('goalForm').addEventListener('submit', function (e) {
     e.preventDefault();
+    var bad = function (el, v, lo, hi) { return el.value !== '' && (!isFinite(v) || v < lo || v > hi); };
     var t = Math.round(parseFloat($('tKg').value) * 10) / 10;
-    if (!isFinite(t) || t < 30 || t > 200) { $('tKg').focus(); return; }
+    var h = Math.round(parseFloat($('hCm').value) * 10) / 10;
     var age = Math.round(parseFloat($('pAge').value));
-    if ($('pAge').value !== '' && (!isFinite(age) || age < 10 || age > 100)) { $('pAge').focus(); return; }
-    targetKg = t;
+    if (bad($('tKg'), t, 30, 200)) { $('tKg').focus(); return; }
+    if (bad($('hCm'), h, 100, 250)) { $('hCm').focus(); return; }
+    if (bad($('pAge'), age, 10, 100)) { $('pAge').focus(); return; }
+    targetKg = isFinite(t) ? t : 0;
+    heightCm = isFinite(h) ? h : 0;
     profile = { age: isFinite(age) ? age : 0, sex: $('pSex').value, act: Number($('pAct').value) || 0 };
-    save('targetKg', t);
+    save('targetKg', targetKg);
+    save('height', heightCm);
     save('profile', profile);
     if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
-    renderDiet();
+    renderSettings();
+    $('gSaved').hidden = false;
   });
 
   // ===== 기록 화면 =====
@@ -1223,7 +1231,7 @@
   function letSleep() { if (wakeLock) { try { wakeLock.release(); } catch (e) {} wakeLock = null; } }
 
   // ===== 화면 전환 =====
-  var VIEWS = ['Setup', 'Weight', 'Diet', 'Run', 'Done'];
+  var VIEWS = ['Setup', 'Weight', 'Diet', 'Settings', 'Run', 'Done'];
   function show(view) {
     VIEWS.forEach(function (v) { $('view' + v).hidden = v.toLowerCase() !== view; });
     document.body.dataset.view = view;
@@ -1235,6 +1243,7 @@
     if (view === 'setup') { renderSetup(); renderLog(); }
     if (view === 'weight') renderWeight();
     if (view === 'diet') { $('fMeal').value = defaultMeal(); renderDiet(); }
+    if (view === 'settings') { $('gSaved').hidden = true; renderSettings(); }
     window.scrollTo(0, 0);
   }
   $('tabbar').addEventListener('click', function (e) {
