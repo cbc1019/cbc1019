@@ -1,0 +1,1276 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="운동">
+<title>운동 앱</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Sans+KR:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* 레이아웃: 한 손으로 쓰는 세로 한 줄. 설정 화면은 차분한 종이색,
+     운동 화면은 구간 색이 화면 전체를 채워 멀리서도 지금 구간이 보인다. */
+  :root {
+    --bg: #f2f4f1;
+    --surface: #ffffff;
+    --ink: #16201f;
+    --muted: #5a6866;
+    --line: #d8ddd8;
+    --accent: #c93a26;
+    --on-accent: #ffffff;
+    --work: #c93a26;
+    --rest: #0f7f78;
+    --prep: #a86400;
+    --setrest: #2f6690;
+    --cool: #4a56b0;
+    --chart: #2f6690;
+    --display: "Barlow Condensed", "Arial Narrow", "Apple SD Gothic Neo", sans-serif;
+    --body: "IBM Plex Sans KR", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --bg: #121716;
+      --surface: #1c2322;
+      --ink: #eef1ee;
+      --muted: #9ba8a5;
+      --line: #2d3735;
+      --accent: #e9634b;
+      --on-accent: #1a0d0a;
+      --chart: #74abd8;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #121716;
+    --surface: #1c2322;
+    --ink: #eef1ee;
+    --muted: #9ba8a5;
+    --line: #2d3735;
+    --accent: #e9634b;
+    --on-accent: #1a0d0a;
+    --chart: #74abd8;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 16px;
+    line-height: 1.45;
+    transition: background-color 0.35s ease;
+  }
+  main { height: 100%; }
+  [hidden] { display: none !important; }
+  button { font: inherit; color: inherit; border: none; background: none; cursor: pointer; touch-action: manipulation; }
+  button:focus-visible, input:focus-visible { outline: 3px solid var(--setrest); outline-offset: 2px; }
+
+  .view {
+    max-width: 480px;
+    margin: 0 auto;
+    padding: calc(20px + env(safe-area-inset-top)) 16px calc(24px + env(safe-area-inset-bottom));
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  /* ===== 설정 화면 ===== */
+  .head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  h1 { font-family: var(--body); font-size: 22px; font-weight: 600; letter-spacing: -0.02em; }
+  .toggle {
+    border: 1px solid var(--line);
+    background: var(--surface);
+    border-radius: 999px;
+    padding: 7px 14px;
+    font-size: 14px;
+    color: var(--muted);
+  }
+  .toggle[aria-pressed="true"] { color: var(--ink); border-color: var(--ink); }
+
+  h2 { font-size: 13px; font-weight: 600; color: var(--muted); letter-spacing: 0.02em; }
+  .block { display: flex; flex-direction: column; gap: 8px; }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 500;
+  }
+  .chip > button { padding: 9px 12px; }
+  .chip > .del { padding: 9px 10px 9px 2px; color: var(--muted); }
+  .chip.on { border-color: var(--ink); background: var(--ink); color: var(--bg); }
+  .chip.on > .del { color: inherit; opacity: 0.7; }
+
+  .rows {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+  }
+  .row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 10px 10px 14px;
+  }
+  .row + .row { border-top: 1px solid var(--line); }
+  .row-label { display: flex; align-items: center; gap: 10px; font-weight: 500; min-width: 0; }
+  .dot { width: 10px; height: 10px; border-radius: 3px; flex: none; background: var(--line); }
+  .stepper { display: flex; align-items: center; gap: 4px; flex: none; }
+  .step-btn {
+    width: 44px; height: 44px;
+    border-radius: 10px;
+    background: var(--bg);
+    font-size: 22px;
+    line-height: 1;
+    user-select: none; -webkit-user-select: none;
+  }
+  .step-btn:active { background: var(--line); }
+  .step-val {
+    min-width: 84px;
+    text-align: center;
+    font-family: var(--display);
+    font-size: 26px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  .step-val.off { color: var(--muted); font-family: var(--body); font-size: 15px; font-weight: 500; }
+
+  .plan {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .plan-top { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .plan-total { font-family: var(--display); font-size: 34px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+  .plan-sub { font-size: 14px; color: var(--muted); }
+
+  .timeline { display: flex; height: 14px; border-radius: 4px; overflow: hidden; background: var(--line); }
+  .timeline.gap { gap: 1px; }
+  .seg { min-width: 0; flex-basis: 0; }
+  .seg.work { background: var(--work); }
+  .seg.rest { background: var(--rest); }
+  .seg.prep { background: var(--prep); }
+  .seg.setrest { background: var(--setrest); }
+  .seg.cool { background: var(--cool); }
+
+  .primary {
+    background: var(--accent);
+    color: var(--on-accent);
+    border-radius: 12px;
+    padding: 16px;
+    font-size: 18px;
+    font-weight: 600;
+    width: 100%;
+  }
+  .primary:active { filter: brightness(0.92); }
+  .ghost {
+    border: 1px solid var(--line);
+    background: var(--surface);
+    border-radius: 12px;
+    padding: 14px;
+    font-weight: 500;
+    width: 100%;
+  }
+
+  .save-row { display: flex; gap: 8px; }
+  .save-row input {
+    flex: 1; min-width: 0;
+    font: inherit; color: var(--ink);
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 10px 12px;
+  }
+  .save-row button {
+    border: 1px solid var(--line);
+    background: var(--surface);
+    border-radius: 10px;
+    padding: 10px 16px;
+    font-weight: 500;
+    flex: none;
+  }
+
+  .log { list-style: none; display: flex; flex-direction: column; }
+  .log li {
+    display: flex; justify-content: space-between; gap: 12px;
+    padding: 10px 2px;
+    border-bottom: 1px solid var(--line);
+    font-size: 14px;
+  }
+  .log .when { color: var(--muted); }
+  .log .num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .empty { font-size: 14px; color: var(--muted); }
+
+  /* ===== 운동 화면 ===== */
+  body[data-view="run"] { background: var(--phase, var(--work)); color: #fff; }
+  body[data-phase="work"] { --phase: var(--work); }
+  body[data-phase="rest"] { --phase: var(--rest); }
+  body[data-phase="prep"] { --phase: var(--prep); }
+  body[data-phase="setrest"] { --phase: var(--setrest); }
+  body[data-phase="cool"] { --phase: var(--cool); }
+
+  #viewRun { height: 100%; justify-content: space-between; align-items: stretch; text-align: center; gap: 12px; }
+  .run-top { display: flex; flex-direction: column; gap: 2px; }
+  .phase-name { font-size: 34px; font-weight: 600; letter-spacing: -0.02em; }
+  .run-pos { font-size: 17px; opacity: 0.9; font-variant-numeric: tabular-nums; }
+
+  .ring-wrap { position: relative; width: min(78vw, 46vh, 340px); aspect-ratio: 1; margin: 0 auto; }
+  .ring-wrap svg { width: 100%; height: 100%; transform: rotate(-90deg); display: block; }
+  .ring-bg { fill: none; stroke: rgba(255,255,255,0.22); stroke-width: 10; }
+  .ring-fg { fill: none; stroke: #fff; stroke-width: 10; stroke-linecap: round; transition: stroke-dashoffset 0.1s linear; }
+  .clock {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: min(34vw, 20vh, 150px);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .clock.long { font-size: min(25vw, 15vh, 110px); }
+  .paused .clock { opacity: 0.55; }
+
+  .run-next { font-size: 17px; opacity: 0.92; }
+  .run-left { font-size: 14px; opacity: 0.8; font-variant-numeric: tabular-nums; }
+  .run-info { display: flex; flex-direction: column; gap: 10px; }
+  #viewRun .timeline { background: rgba(255,255,255,0.2); height: 10px; }
+  #viewRun .seg { background: rgba(255,255,255,0.3); }
+  #viewRun .seg.done { background: rgba(255,255,255,0.85); }
+  #viewRun .seg.now { background: #fff; }
+
+  .controls { display: flex; align-items: center; justify-content: center; gap: 18px; }
+  .ctl {
+    width: 64px; height: 64px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.2);
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .ctl:active { background: rgba(255,255,255,0.35); }
+  .ctl.main { width: 92px; height: 92px; background: #fff; color: var(--phase, var(--work)); font-size: 17px; }
+  .ctl:focus-visible, .stop:focus-visible { outline-color: #fff; }
+  .stop { color: #fff; font-weight: 600; padding: 10px; text-decoration: underline; text-underline-offset: 4px; min-height: 44px; }
+  .stop-slot { min-height: 44px; }
+
+  .clock.xlong { font-size: min(19vw, 12vh, 84px); }
+  .step-val { min-width: 96px; }
+  .step-val.txt { font-family: var(--body); font-size: 17px; font-weight: 600; }
+  .gone { visibility: hidden; }
+
+  /* ===== 모드 선택 · 하단 탭 ===== */
+  .modes {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px;
+    background: var(--line); border-radius: 12px; padding: 4px;
+  }
+  .modes button { padding: 10px 4px; border-radius: 9px; font-weight: 600; color: var(--muted); }
+  .modes button[aria-pressed="true"] { background: var(--surface); color: var(--ink); }
+
+  .tabbar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 5;
+    display: flex; justify-content: center;
+    background: var(--surface); border-top: 1px solid var(--line);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .tabbar button { flex: 1; max-width: 160px; padding: 14px 4px; font-weight: 600; color: var(--muted); border-top: 3px solid transparent; }
+  .tabbar button[aria-current="page"] { color: var(--ink); border-top-color: var(--accent); }
+  .view.tabbed { padding-bottom: calc(84px + env(safe-area-inset-bottom)); }
+
+  /* ===== 완료 화면 · 통계 ===== */
+  .done-title { font-size: 28px; font-weight: 600; letter-spacing: -0.02em; text-wrap: balance; }
+  .stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .stats.three { grid-template-columns: repeat(3, 1fr); }
+  .stat { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 14px 8px; text-align: center; }
+  .stat b { display: block; font-family: var(--display); font-size: 32px; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .stat span { font-size: 13px; color: var(--muted); }
+  .note { font-size: 14px; color: var(--muted); }
+
+  .field-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .field-row input {
+    flex: 1; min-width: 0;
+    font: inherit; color: var(--ink);
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 10px 12px;
+  }
+  .field-row input[type="date"] { flex: 1.3; }
+  .field-row .unit { color: var(--muted); font-size: 15px; flex: none; }
+  .field-row button {
+    border-radius: 10px; padding: 10px 18px; font-weight: 600; flex: none;
+    background: var(--ink); color: var(--bg);
+  }
+
+  /* ===== 체중 ===== */
+  .hero { display: flex; flex-direction: column; gap: 2px; }
+  .hero-num { font-family: var(--display); font-size: 64px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+  .hero-num small { font-family: var(--body); font-size: 18px; font-weight: 500; color: var(--muted); margin-left: 6px; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+  .card-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+  .card-title { font-weight: 600; }
+  .ranges { display: flex; gap: 4px; }
+  .ranges button { padding: 6px 10px; border-radius: 8px; font-size: 13px; font-weight: 500; color: var(--muted); border: 1px solid var(--line); }
+  .ranges button[aria-pressed="true"] { color: var(--bg); background: var(--ink); border-color: var(--ink); }
+  .chart-wrap { position: relative; touch-action: pan-y; }
+  .chart-wrap svg { display: block; width: 100%; height: 190px; }
+  .chart-wrap text { font-family: var(--body); font-size: 11px; fill: var(--muted); font-variant-numeric: tabular-nums; }
+  .chart-wrap text.val { fill: var(--ink); font-size: 13px; font-weight: 600; }
+  .grid-line { stroke: var(--line); stroke-width: 1; }
+  .w-line { fill: none; stroke: var(--chart); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+  .w-area { fill: var(--chart); opacity: 0.1; }
+  .w-dot { fill: var(--chart); stroke: var(--surface); stroke-width: 2; }
+  .cross { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 3 3; }
+  .tip {
+    position: absolute; top: 0; pointer-events: none; white-space: nowrap;
+    background: var(--ink); color: var(--bg);
+    font-size: 12px; font-weight: 500; padding: 4px 8px; border-radius: 6px;
+    font-variant-numeric: tabular-nums;
+  }
+  .log .del { color: var(--muted); padding: 0 4px 0 10px; }
+  .log li { align-items: center; }
+  .log .right { display: flex; align-items: center; flex: none; }
+
+  @media (prefers-reduced-motion: reduce) {
+    body, .ring-fg { transition: none; }
+  }
+</style>
+</head>
+<body data-view="setup">
+
+<main>
+  <!-- 운동 설정 -->
+  <section class="view tabbed" id="viewSetup">
+    <div class="head">
+      <h1>운동</h1>
+      <button type="button" class="toggle" id="soundBtn" aria-pressed="true">소리 켜짐</button>
+    </div>
+
+    <div class="modes" id="modes">
+      <button type="button" data-mode="interval">인터벌</button>
+      <button type="button" data-mode="rope">줄넘기</button>
+      <button type="button" data-mode="run">러닝</button>
+    </div>
+
+    <div class="block" id="presetBlock">
+      <h2>루틴</h2>
+      <div class="chips" id="presets"></div>
+    </div>
+
+    <div class="rows" id="rows"></div>
+
+    <div class="plan">
+      <div class="plan-top">
+        <div class="plan-total" id="planTotal">0:00</div>
+        <div class="plan-sub" id="planSub"></div>
+      </div>
+      <div class="timeline" id="planLine" aria-hidden="true"></div>
+      <button type="button" class="primary" id="startBtn">운동 시작</button>
+    </div>
+
+    <div class="block" id="saveBlock">
+      <h2>지금 설정을 내 루틴으로 저장</h2>
+      <form class="save-row" id="saveForm">
+        <input type="text" id="presetName" maxlength="12" placeholder="루틴 이름" autocomplete="off" aria-label="루틴 이름">
+        <button type="submit">저장</button>
+      </form>
+    </div>
+  </section>
+
+  <!-- 체중 -->
+  <section class="view tabbed" id="viewWeight" hidden>
+    <div class="head"><h1>체중</h1></div>
+
+    <div class="hero">
+      <div class="hero-num" id="wNow">—<small>kg</small></div>
+      <div class="note" id="wDiff">체중을 기록하면 변화와 소모 칼로리를 계산합니다.</div>
+    </div>
+
+    <form class="field-row" id="weightForm">
+      <input type="date" id="wDate" aria-label="날짜" required>
+      <input type="number" id="wKg" inputmode="decimal" step="0.1" min="20" max="300" placeholder="체중" aria-label="체중 (kg)" required>
+      <span class="unit">kg</span>
+      <button type="submit">기록</button>
+    </form>
+
+    <div class="card">
+      <div class="card-top">
+        <div class="card-title" id="chartTitle">체중 추이</div>
+        <div class="ranges" id="ranges">
+          <button type="button" data-days="30">1개월</button>
+          <button type="button" data-days="90">3개월</button>
+          <button type="button" data-days="0">전체</button>
+        </div>
+      </div>
+      <div class="chart-wrap" id="chart"></div>
+      <p class="empty" id="chartEmpty" hidden>이 기간에 기록이 없습니다. 체중을 기록하면 추이가 그려집니다.</p>
+    </div>
+
+    <div class="block">
+      <h2>기록한 체중</h2>
+      <ul class="log" id="wList"></ul>
+      <p class="empty" id="wEmpty">아직 기록이 없습니다.</p>
+    </div>
+  </section>
+
+  <!-- 기록 -->
+  <section class="view tabbed" id="viewLog" hidden>
+    <div class="head"><h1>기록</h1></div>
+    <div class="block">
+      <h2>최근 7일</h2>
+      <div class="stats three">
+        <div class="stat"><b id="wkCount">0</b><span>운동 횟수</span></div>
+        <div class="stat"><b id="wkTime">0:00</b><span>운동한 시간</span></div>
+        <div class="stat"><b id="wkKcal">—</b><span>추정 kcal</span></div>
+      </div>
+    </div>
+    <div class="block">
+      <h2>운동 기록</h2>
+      <ul class="log" id="log"></ul>
+      <p class="empty" id="logEmpty">아직 기록이 없습니다. 운동을 마치면 여기에 쌓입니다.</p>
+    </div>
+  </section>
+
+  <!-- 운동 중 -->
+  <section class="view" id="viewRun" hidden>
+    <div class="run-top">
+      <div class="phase-name" id="phaseName" aria-live="polite">운동</div>
+      <div class="run-pos" id="runPos"></div>
+    </div>
+
+    <div class="ring-wrap" id="ringWrap">
+      <svg viewBox="0 0 300 300" aria-hidden="true">
+        <circle class="ring-bg" cx="150" cy="150" r="140"></circle>
+        <circle class="ring-fg" id="ring" cx="150" cy="150" r="140" stroke-dasharray="879.65" stroke-dashoffset="0"></circle>
+      </svg>
+      <div class="clock" id="clock" role="timer">30</div>
+    </div>
+
+    <div class="run-info">
+      <div class="run-next" id="runNext"></div>
+      <div class="timeline" id="runLine" aria-hidden="true"></div>
+      <div class="run-left" id="runLeft"></div>
+    </div>
+
+    <div>
+      <div class="controls">
+        <button type="button" class="ctl" id="prevBtn" aria-label="이전 구간">이전</button>
+        <button type="button" class="ctl main" id="pauseBtn">일시정지</button>
+        <button type="button" class="ctl" id="nextBtn" aria-label="다음 구간">다음</button>
+      </div>
+      <div class="stop-slot">
+        <button type="button" class="stop" id="stopBtn" hidden>운동 끝내기</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 완료 -->
+  <section class="view" id="viewDone" hidden>
+    <div class="done-title" id="doneTitle">운동 완료</div>
+    <div class="stats" id="doneStats"></div>
+    <div class="block" id="doneInputBlock">
+      <h2 id="doneInputLabel">거리</h2>
+      <div class="field-row">
+        <input type="number" id="doneInput" inputmode="decimal" min="0" aria-labelledby="doneInputLabel">
+        <span class="unit" id="doneInputUnit">km</span>
+      </div>
+    </div>
+    <p class="note" id="doneNote" hidden>체중 탭에서 체중을 기록하면 소모 칼로리를 추정합니다.</p>
+    <button type="button" class="primary" id="againBtn">같은 운동 다시 하기</button>
+    <button type="button" class="ghost" id="backBtn">처음으로 돌아가기</button>
+  </section>
+</main>
+
+<nav class="tabbar" id="tabbar" aria-label="화면">
+  <button type="button" data-tab="setup">운동</button>
+  <button type="button" data-tab="weight">체중</button>
+  <button type="button" data-tab="log">기록</button>
+</nav>
+
+<script>
+(function () {
+  'use strict';
+
+  var $ = function (id) { return document.getElementById(id); };
+
+  // ===== 표기 =====
+  function clock(sec) {
+    sec = Math.max(0, Math.round(sec));
+    var h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+    if (h) return h + ':' + (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
+    return m + ':' + (s < 10 ? '0' : '') + s;
+  }
+  function words(sec) {
+    var m = Math.floor(sec / 60), s = sec % 60;
+    if (!m) return s + '초';
+    return m + '분' + (s ? ' ' + s + '초' : '');
+  }
+  function esc(s) {
+    return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; });
+  }
+  function dateStr(d) {
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+  function md(ms) { var d = new Date(ms); return (d.getMonth() + 1) + '/' + d.getDate(); }
+
+  // ===== 모드별 설정 항목 =====
+  var MODES = {
+    interval: {
+      label: '인터벌',
+      def: { prep: 10, work: 20, rest: 10, rounds: 8, sets: 1, setRest: 60, cool: 0 },
+      fields: [
+        { k: 'prep',    label: '준비',           min: 0, max: 300,  step: 5, phase: 'prep',    fmt: clock, zero: '없음' },
+        { k: 'work',    label: '운동',           min: 5, max: 1800, step: 5, phase: 'work',    fmt: clock },
+        { k: 'rest',    label: '휴식',           min: 0, max: 1800, step: 5, phase: 'rest',    fmt: clock, zero: '없음' },
+        { k: 'rounds',  label: '라운드',         min: 1, max: 50,   step: 1, fmt: function (v) { return v + '회'; } },
+        { k: 'sets',    label: '세트',           min: 1, max: 10,   step: 1, fmt: function (v) { return v + '세트'; } },
+        { k: 'setRest', label: '세트 사이 휴식', min: 0, max: 1800, step: 5, phase: 'setrest', fmt: clock, zero: '없음',
+          showIf: function (c) { return c.sets > 1; } },
+        { k: 'cool',    label: '마무리 운동',    min: 0, max: 1800, step: 5, phase: 'cool',    fmt: clock, zero: '없음' }
+      ]
+    },
+    rope: {
+      label: '줄넘기',
+      def: { prep: 5, work: 60, rest: 30, sets: 5, bpm: 0 },
+      fields: [
+        { k: 'prep', label: '준비',      min: 0,  max: 60,   step: 5,  phase: 'prep', fmt: clock, zero: '없음' },
+        { k: 'work', label: '줄넘기',    min: 10, max: 1800, step: 10, phase: 'work', fmt: clock },
+        { k: 'rest', label: '휴식',      min: 0,  max: 600,  step: 5,  phase: 'rest', fmt: clock, zero: '없음' },
+        { k: 'sets', label: '세트',      min: 1,  max: 30,   step: 1,  fmt: function (v) { return v + '세트'; } },
+        { k: 'bpm',  label: '박자 소리', min: 0,  floor: 80, max: 220, step: 10, txt: true,
+          fmt: function (v) { return '분당 ' + v + '회'; }, zero: '없음' }
+      ]
+    },
+    run: {
+      label: '러닝',
+      def: { prep: 5, target: 1800, alert: 300 },
+      fields: [
+        { k: 'prep',   label: '준비',      min: 0, max: 60, step: 5, phase: 'prep', fmt: clock, zero: '없음' },
+        { k: 'target', label: '목표 시간', min: 0, floor: 300, max: 14400, step: 300, phase: 'work', txt: true,
+          fmt: function (v) { return v / 60 + '분'; }, zero: '자유 달리기' },
+        { k: 'alert',  label: '시간 알림', min: 0, floor: 60, max: 1800, step: 60, txt: true,
+          fmt: function (v) { return v / 60 + '분마다'; }, zero: '없음' }
+      ]
+    }
+  };
+  var MODE_KEYS = ['interval', 'rope', 'run'];
+
+  var BUILTIN = [
+    { name: '타바타',      cfg: { prep: 10, work: 20, rest: 10, rounds: 8,  sets: 1, setRest: 60, cool: 0 } },
+    { name: 'HIIT 30/30',  cfg: { prep: 10, work: 30, rest: 30, rounds: 10, sets: 1, setRest: 60, cool: 0 } },
+    { name: '서킷 3세트',  cfg: { prep: 10, work: 40, rest: 20, rounds: 5,  sets: 3, setRest: 90, cool: 0 } },
+    { name: '러닝 인터벌', cfg: { prep: 10, work: 60, rest: 120, rounds: 6, sets: 1, setRest: 60, cool: 300 } }
+  ];
+
+  // ===== 저장소 (없어도 동작) =====
+  function load(key, fallback) {
+    try { var v = localStorage.getItem('intervalTrainer.' + key); return v ? JSON.parse(v) : fallback; }
+    catch (e) { return fallback; }
+  }
+  function save(key, value) {
+    try { localStorage.setItem('intervalTrainer.' + key, JSON.stringify(value)); } catch (e) {}
+  }
+  // 체중은 타바타 타이머와 같은 키를 써서 같은 주소에서는 기록을 함께 쓴다.
+  function loadWeights() {
+    try { var v = localStorage.getItem('tabataWeights'); var o = v ? JSON.parse(v) : {}; return o && typeof o === 'object' ? o : {}; }
+    catch (e) { return {}; }
+  }
+  function saveWeights(w) { try { localStorage.setItem('tabataWeights', JSON.stringify(w)); } catch (e) {} }
+
+  function sanitize(mode, c) {
+    var out = {};
+    MODES[mode].fields.forEach(function (f) {
+      var v = Math.round(Number(c && c[f.k]));
+      if (!isFinite(v)) v = MODES[mode].def[f.k];
+      v = Math.max(f.min, Math.min(f.max, v));
+      if (f.floor && v > 0 && v < f.floor) v = f.floor;
+      out[f.k] = v;
+    });
+    return out;
+  }
+
+  var savedCfgs = load('cfgs', null) || { interval: load('cfg', null) };
+  var cfgs = {};
+  MODE_KEYS.forEach(function (m) { cfgs[m] = sanitize(m, savedCfgs[m] || MODES[m].def); });
+  var mode = load('mode', 'interval');
+  if (!MODES[mode]) mode = 'interval';
+  var myPresets = load('presets', []);
+  var log = load('log', []);
+  var soundOn = load('sound', true);
+  var weights = loadWeights();
+  var rangeDays = load('range', 30);
+
+  function weightEntries() {
+    return Object.keys(weights).sort().map(function (d) {
+      var p = d.split('-');
+      return { d: d, t: new Date(+p[0], +p[1] - 1, +p[2]).getTime(), kg: Number(weights[d]) };
+    }).filter(function (e) { return isFinite(e.kg) && e.kg > 0 && isFinite(e.t); });
+  }
+  function latestKg() { var e = weightEntries(); return e.length ? e[e.length - 1].kg : null; }
+
+  // ===== 칼로리 추정 (MET) =====
+  function kcalOf(r, kg) {
+    if (!kg) return null;
+    var m = r.mode || 'interval', restSec = Math.max(0, r.total - r.work);
+    if (m === 'run') return Math.round(r.km > 0 ? kg * r.km * 1.036 : 9.0 * kg * r.work / 3600);
+    var met = m === 'rope' ? 11.0 : 8.0;
+    return Math.round((met * r.work + 3.5 * restSec) * kg / 3600);
+  }
+
+  // ===== 구간 목록 만들기 =====
+  function buildSteps(m, c) {
+    var steps = [], s, r;
+    if (c.prep > 0) steps.push({ type: 'prep', label: '준비', dur: c.prep, pos: '' });
+    if (m === 'interval') {
+      for (s = 1; s <= c.sets; s++) {
+        for (r = 1; r <= c.rounds; r++) {
+          var pos = (c.sets > 1 ? '세트 ' + s + '/' + c.sets + ' · ' : '') + '라운드 ' + r + '/' + c.rounds;
+          steps.push({ type: 'work', label: '운동', dur: c.work, pos: pos });
+          if (r < c.rounds && c.rest > 0) steps.push({ type: 'rest', label: '휴식', dur: c.rest, pos: pos });
+        }
+        if (s < c.sets && c.setRest > 0) steps.push({ type: 'setrest', label: '세트 휴식', dur: c.setRest, pos: '세트 ' + s + '/' + c.sets + ' 끝' });
+      }
+      if (c.cool > 0) steps.push({ type: 'cool', label: '마무리 운동', dur: c.cool, pos: '' });
+    } else if (m === 'rope') {
+      for (s = 1; s <= c.sets; s++) {
+        steps.push({ type: 'work', label: '줄넘기', dur: c.work, pos: '세트 ' + s + '/' + c.sets });
+        if (s < c.sets && c.rest > 0) steps.push({ type: 'rest', label: '휴식', dur: c.rest, pos: '세트 ' + s + '/' + c.sets + ' 끝' });
+      }
+    } else {
+      steps.push({ type: 'work', label: '러닝', up: true, open: !c.target, dur: c.target || 86400,
+        pos: c.target ? '목표 ' + words(c.target) : '자유 달리기' });
+    }
+    return steps;
+  }
+  function totalOf(steps) { return steps.reduce(function (a, s) { return a + s.dur; }, 0); }
+
+  function drawLine(el, steps) {
+    el.className = 'timeline' + (steps.length <= 60 ? ' gap' : '');
+    el.innerHTML = steps.map(function (s) {
+      return '<div class="seg ' + s.type + '" style="flex-grow:' + s.dur + '"></div>';
+    }).join('');
+  }
+
+  function sameCfg(a, b) {
+    return MODES.interval.fields.every(function (f) {
+      if (f.k === 'setRest' && a.sets === 1 && b.sets === 1) return true;
+      return a[f.k] === b[f.k];
+    });
+  }
+  function presetName() {
+    var all = BUILTIN.concat(myPresets);
+    for (var i = 0; i < all.length; i++) if (sameCfg(all[i].cfg, cfgs.interval)) return all[i].name;
+    return null;
+  }
+
+  // ===== 운동 설정 화면 =====
+  function renderRows() {
+    $('rows').innerHTML = MODES[mode].fields.map(function (f) {
+      return '<div class="row" data-k="' + f.k + '">' +
+        '<div class="row-label"><span class="dot"' + (f.phase ? ' style="background:var(--' + f.phase + ')"' : '') + '></span>' + f.label + '</div>' +
+        '<div class="stepper">' +
+          '<button type="button" class="step-btn" data-d="-1" aria-label="' + f.label + ' 줄이기">−</button>' +
+          '<div class="step-val" id="val-' + f.k + '"></div>' +
+          '<button type="button" class="step-btn" data-d="1" aria-label="' + f.label + ' 늘리기">+</button>' +
+        '</div></div>';
+    }).join('');
+  }
+
+  function renderSetup() {
+    var c = cfgs[mode];
+    Array.prototype.forEach.call($('modes').children, function (b) {
+      b.setAttribute('aria-pressed', String(b.dataset.mode === mode));
+    });
+    MODES[mode].fields.forEach(function (f) {
+      var el = $('val-' + f.k), v = c[f.k];
+      var off = f.zero && v === 0;
+      el.textContent = off ? f.zero : f.fmt(v);
+      el.className = 'step-val' + (off ? ' off' : f.txt ? ' txt' : '');
+      if (f.showIf) el.closest('.row').hidden = !f.showIf(c);
+    });
+
+    var steps = buildSteps(mode, c);
+    var total, sub;
+    if (mode === 'interval') {
+      total = clock(totalOf(steps));
+      sub = '운동 ' + words(c.work * c.rounds * c.sets) + ' · ' + (c.sets > 1 ? c.sets + '세트 × ' : '') + c.rounds + '라운드';
+    } else if (mode === 'rope') {
+      total = clock(totalOf(steps));
+      sub = '줄넘기 ' + words(c.work * c.sets) + (c.bpm ? ' · 약 ' + Math.round(c.bpm * c.work * c.sets / 60) + '회' : ' · ' + c.sets + '세트');
+    } else {
+      total = c.target ? clock(c.target) : '자유';
+      sub = (c.target ? '목표 시간에 끝납니다' : '끝낼 때까지 잽니다') + (c.alert ? ' · ' + c.alert / 60 + '분마다 알림' : '');
+    }
+    $('planTotal').textContent = total;
+    $('planSub').textContent = sub;
+    $('planLine').hidden = mode === 'run';
+    drawLine($('planLine'), steps);
+    $('startBtn').textContent = MODES[mode].label + ' 시작';
+
+    $('presetBlock').hidden = $('saveBlock').hidden = mode !== 'interval';
+    var name = presetName();
+    $('presets').innerHTML = BUILTIN.concat(myPresets).map(function (p, i) {
+      var mine = i >= BUILTIN.length;
+      return '<span class="chip' + (p.name === name ? ' on' : '') + '">' +
+        '<button type="button" data-i="' + i + '">' + esc(p.name) + '</button>' +
+        (mine ? '<button type="button" class="del" data-del="' + (i - BUILTIN.length) + '" aria-label="' + esc(p.name) + ' 삭제">✕</button>' : '') +
+        '</span>';
+    }).join('');
+
+    $('soundBtn').textContent = soundOn ? '소리 켜짐' : '소리 꺼짐';
+    $('soundBtn').setAttribute('aria-pressed', String(soundOn));
+  }
+
+  function adjust(k, dir) {
+    var f = MODES[mode].fields.filter(function (x) { return x.k === k; })[0];
+    var c = cfgs[mode], v = c[k] + dir * f.step;
+    if (f.floor && v > 0 && v < f.floor) v = dir > 0 ? f.floor : 0;
+    c[k] = Math.max(f.min, Math.min(f.max, v));
+    save('cfgs', cfgs);
+    renderSetup();
+  }
+
+  // 길게 누르면 연속 조절
+  var holdTimer = null, holdRepeat = null, held = false;
+  function stopHold() { clearTimeout(holdTimer); clearInterval(holdRepeat); holdTimer = holdRepeat = null; }
+  $('rows').addEventListener('pointerdown', function (e) {
+    var b = e.target.closest('.step-btn'); if (!b) return;
+    var k = b.closest('.row').dataset.k, d = Number(b.dataset.d);
+    held = false;
+    stopHold();
+    holdTimer = setTimeout(function () {
+      held = true;
+      holdRepeat = setInterval(function () { adjust(k, d); }, 70);
+    }, 400);
+  });
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach(function (t) { $('rows').addEventListener(t, stopHold); });
+  $('rows').addEventListener('contextmenu', function (e) { if (e.target.closest('.step-btn')) e.preventDefault(); });
+  $('rows').addEventListener('click', function (e) {
+    var b = e.target.closest('.step-btn'); if (!b) return;
+    if (held) { held = false; return; }
+    adjust(b.closest('.row').dataset.k, Number(b.dataset.d));
+  });
+
+  $('modes').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    mode = b.dataset.mode;
+    save('mode', mode);
+    renderRows();
+    renderSetup();
+  });
+
+  $('presets').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.del !== undefined) {
+      myPresets.splice(Number(b.dataset.del), 1);
+      save('presets', myPresets);
+    } else {
+      cfgs.interval = sanitize('interval', BUILTIN.concat(myPresets)[Number(b.dataset.i)].cfg);
+      save('cfgs', cfgs);
+    }
+    renderSetup();
+  });
+
+  $('saveForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var input = $('presetName');
+    var name = input.value.trim();
+    if (!name) { input.focus(); return; }
+    myPresets = myPresets.filter(function (p) { return p.name !== name; });
+    myPresets.push({ name: name, cfg: sanitize('interval', cfgs.interval) });
+    if (myPresets.length > 8) myPresets.shift();
+    save('presets', myPresets);
+    input.value = '';
+    input.blur();
+    renderSetup();
+  });
+
+  $('soundBtn').addEventListener('click', function () {
+    soundOn = !soundOn;
+    save('sound', soundOn);
+    if (soundOn) { initAudio(); tone(880, 0, 0.12, 0.3); }
+    renderSetup();
+  });
+
+  // ===== 체중 화면 =====
+  function fmtKg(v) { return (Math.round(v * 10) / 10).toFixed(1); }
+  function signed(v) { var r = Math.round(v * 10) / 10; return (r > 0 ? '+' : r < 0 ? '−' : '') + Math.abs(r).toFixed(1) + 'kg'; }
+
+  function renderWeight() {
+    var all = weightEntries();
+    var last = all[all.length - 1], prev = all[all.length - 2];
+    $('wNow').innerHTML = (last ? fmtKg(last.kg) : '—') + '<small>kg</small>';
+    if (!last) $('wDiff').textContent = '체중을 기록하면 변화와 소모 칼로리를 계산합니다.';
+    else if (!prev) $('wDiff').textContent = md(last.t) + ' 기록';
+    else {
+      var d = Math.round((last.kg - prev.kg) * 10) / 10;
+      $('wDiff').textContent = md(last.t) + ' 기록 · 직전 기록(' + md(prev.t) + ')보다 ' +
+        (d === 0 ? '변화 없음' : Math.abs(d).toFixed(1) + 'kg ' + (d > 0 ? '늘었습니다' : '줄었습니다'));
+    }
+    if (!$('wDate').value) $('wDate').value = dateStr(new Date());
+    $('wDate').max = dateStr(new Date());
+    if (last) $('wKg').placeholder = fmtKg(last.kg);
+
+    Array.prototype.forEach.call($('ranges').children, function (b) {
+      b.setAttribute('aria-pressed', String(Number(b.dataset.days) === rangeDays));
+    });
+    drawChart(all);
+
+    $('wList').innerHTML = all.slice().reverse().slice(0, 14).map(function (e, i, arr) {
+      var older = arr[i + 1];
+      return '<li><span><span class="when">' + e.d.replace(/-/g, '.') + '</span></span>' +
+        '<span class="right"><span class="num">' + fmtKg(e.kg) + 'kg' +
+        (older ? ' <span class="when">(' + signed(e.kg - older.kg) + ')</span>' : '') + '</span>' +
+        '<button type="button" class="del" data-d="' + e.d + '" aria-label="' + e.d + ' 기록 삭제">✕</button></span></li>';
+    }).join('');
+    $('wEmpty').hidden = all.length > 0;
+  }
+
+  var chartPts = [];
+  function drawChart(all) {
+    var box = $('chart');
+    var since = rangeDays ? Date.now() - rangeDays * 86400000 : 0;
+    var pts = all.filter(function (e) { return e.t >= since; });
+    $('chartEmpty').hidden = pts.length > 0;
+    box.hidden = pts.length === 0;
+    chartPts = [];
+    if (!pts.length) { $('chartTitle').textContent = '체중 추이'; return; }
+
+    var first = pts[0], last = pts[pts.length - 1];
+    $('chartTitle').textContent = pts.length > 1 ? '체중 추이 · 기간 내 ' + signed(last.kg - first.kg) : '체중 추이';
+
+    var W = box.clientWidth || 320, H = 190, L = 40, R = 18, T = 28, B = 24;
+    var lo = Math.min.apply(null, pts.map(function (p) { return p.kg; }));
+    var hi = Math.max.apply(null, pts.map(function (p) { return p.kg; }));
+    var step = [0.5, 1, 2, 5, 10, 20, 50].filter(function (s) { return Math.max(hi - lo, 0.5) / s <= 4; })[0] || 50;
+    var y0 = Math.floor(lo / step) * step, y1 = Math.ceil(hi / step) * step;
+    if (y0 === y1) { y0 -= step; y1 += step; }
+    var t0 = first.t, t1 = last.t;
+    var X = function (t) { return t1 === t0 ? L + (W - L - R) / 2 : L + (t - t0) / (t1 - t0) * (W - L - R); };
+    var Y = function (kg) { return T + (y1 - kg) / (y1 - y0) * (H - T - B); };
+
+    var h = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="체중 추이 꺾은선 그래프. 아래 목록에 같은 값이 있습니다.">';
+    for (var g = y0; g <= y1 + 1e-9; g += step) {
+      h += '<line class="grid-line" x1="' + L + '" x2="' + (W - R) + '" y1="' + Y(g) + '" y2="' + Y(g) + '"></line>' +
+        '<text x="' + (L - 6) + '" y="' + (Y(g) + 4) + '" text-anchor="end">' + (step < 1 ? g.toFixed(1) : g) + '</text>';
+    }
+    chartPts = pts.map(function (p) { return { x: X(p.t), y: Y(p.kg), p: p }; });
+    var path = chartPts.map(function (c, i) { return (i ? 'L' : 'M') + c.x.toFixed(1) + ' ' + c.y.toFixed(1); }).join(' ');
+    if (pts.length > 1) {
+      h += '<path class="w-area" d="' + path + ' L' + chartPts[chartPts.length - 1].x.toFixed(1) + ' ' + (H - B) + ' L' + chartPts[0].x.toFixed(1) + ' ' + (H - B) + ' Z"></path>' +
+        '<path class="w-line" d="' + path + '"></path>';
+      if (pts.length <= 20) chartPts.slice(0, -1).forEach(function (c) { h += '<circle class="w-dot" cx="' + c.x + '" cy="' + c.y + '" r="3.5"></circle>'; });
+    }
+    var e = chartPts[chartPts.length - 1];
+    h += '<line class="cross" id="cross" y1="' + T + '" y2="' + (H - B) + '" visibility="hidden"></line>' +
+      '<circle class="w-dot" cx="' + e.x + '" cy="' + e.y + '" r="5"></circle>' +
+      '<circle class="w-dot" id="hoverDot" r="5" visibility="hidden"></circle>' +
+      '<text class="val" x="' + (pts.length > 1 ? e.x + 6 : e.x) + '" y="' + (e.y - 12) + '" text-anchor="' + (pts.length > 1 ? 'end' : 'middle') + '">' + fmtKg(last.kg) + '</text>';
+    if (pts.length > 1) {
+      h += '<text x="' + L + '" y="' + (H - 6) + '">' + md(t0) + '</text>' +
+        '<text x="' + (W - R) + '" y="' + (H - 6) + '" text-anchor="end">' + md(t1) + '</text>';
+    } else {
+      h += '<text x="' + e.x + '" y="' + (H - 6) + '" text-anchor="middle">' + md(t0) + '</text>';
+    }
+    h += '</svg><div class="tip" id="tip" hidden></div>';
+    box.innerHTML = h;
+  }
+
+  function hoverChart(ev) {
+    if (!chartPts.length) return;
+    var box = $('chart'), rect = box.getBoundingClientRect();
+    var x = ev.clientX - rect.left, best = chartPts[0];
+    chartPts.forEach(function (c) { if (Math.abs(c.x - x) < Math.abs(best.x - x)) best = c; });
+    var cross = $('cross'), dot = $('hoverDot'), tip = $('tip');
+    cross.setAttribute('x1', best.x); cross.setAttribute('x2', best.x); cross.setAttribute('visibility', 'visible');
+    dot.setAttribute('cx', best.x); dot.setAttribute('cy', best.y); dot.setAttribute('visibility', 'visible');
+    tip.textContent = best.p.d.slice(5).replace('-', '/') + ' · ' + fmtKg(best.p.kg) + 'kg';
+    tip.hidden = false;
+    tip.style.left = Math.max(0, Math.min(rect.width - tip.offsetWidth, best.x - tip.offsetWidth / 2)) + 'px';
+  }
+  function leaveChart() {
+    ['cross', 'hoverDot'].forEach(function (id) { if ($(id)) $(id).setAttribute('visibility', 'hidden'); });
+    if ($('tip')) $('tip').hidden = true;
+  }
+  $('chart').addEventListener('pointermove', hoverChart);
+  $('chart').addEventListener('pointerdown', hoverChart);
+  $('chart').addEventListener('pointerleave', leaveChart);
+  window.addEventListener('resize', function () { if (!$('viewWeight').hidden) drawChart(weightEntries()); });
+
+  $('ranges').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    rangeDays = Number(b.dataset.days);
+    save('range', rangeDays);
+    renderWeight();
+  });
+  $('weightForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var kg = Math.round(parseFloat($('wKg').value) * 10) / 10, d = $('wDate').value;
+    if (!d || !isFinite(kg) || kg < 20 || kg > 300) { $('wKg').focus(); return; }
+    weights = loadWeights();
+    weights[d] = kg;
+    saveWeights(weights);
+    $('wKg').value = '';
+    $('wKg').blur();
+    renderWeight();
+  });
+  $('wList').addEventListener('click', function (e) {
+    var b = e.target.closest('.del'); if (!b) return;
+    weights = loadWeights();
+    delete weights[b.dataset.d];
+    saveWeights(weights);
+    renderWeight();
+  });
+
+  // ===== 기록 화면 =====
+  function recLine(r) {
+    var m = r.mode || 'interval';
+    var title = m === 'interval' ? (r.name && r.name !== '직접 설정' ? r.name : '인터벌') : MODES[m].label;
+    var bits = [clock(m === 'run' ? r.work : r.total)];
+    if (m === 'interval') bits.push(r.rounds + '라운드');
+    if (m === 'rope') bits.push(r.count > 0 ? r.count + '회' : r.rounds + '세트');
+    if (m === 'run' && r.km > 0) bits.push(r.km + 'km');
+    if (r.kcal) bits.push(r.kcal + 'kcal');
+    return { title: title + (r.early ? ' (중간 종료)' : ''), detail: bits.join(' · ') };
+  }
+  function renderLog() {
+    var since = Date.now() - 7 * 86400000;
+    var week = log.filter(function (r) { return r.at >= since; });
+    var kcal = week.reduce(function (a, r) { return a + (r.kcal || 0); }, 0);
+    $('wkCount').textContent = week.length;
+    $('wkTime').textContent = clock(week.reduce(function (a, r) { return a + r.total; }, 0));
+    $('wkKcal').textContent = kcal ? kcal : '—';
+    $('log').innerHTML = log.map(function (r, i) {
+      var l = recLine(r);
+      return '<li><span><span class="when">' + md(r.at) + '</span> ' + esc(l.title) + '</span>' +
+        '<span class="right"><span class="num">' + l.detail + '</span>' +
+        '<button type="button" class="del" data-i="' + i + '" aria-label="기록 삭제">✕</button></span></li>';
+    }).join('');
+    $('logEmpty').hidden = log.length > 0;
+  }
+  $('log').addEventListener('click', function (e) {
+    var b = e.target.closest('.del'); if (!b) return;
+    log.splice(Number(b.dataset.i), 1);
+    save('log', log);
+    renderLog();
+  });
+
+  // ===== 소리 · 진동 =====
+  var audioCtx = null;
+  function initAudio() {
+    try {
+      if (!audioCtx) {
+        var Ctx = window.AudioContext || window.webkitAudioContext;
+        if (Ctx) audioCtx = new Ctx();
+      }
+      if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+    } catch (e) {}
+  }
+  function toneAt(freq, t, dur, vol, type) {
+    if (!soundOn || !audioCtx) return;
+    try {
+      var osc = audioCtx.createOscillator(), gain = audioCtx.createGain();
+      osc.type = type || 'sine';
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.0001, t);
+      gain.gain.linearRampToValueAtTime(vol, t + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + dur);
+      osc.connect(gain); gain.connect(audioCtx.destination);
+      osc.start(t); osc.stop(t + dur + 0.02);
+    } catch (e) {}
+  }
+  function tone(freq, delay, dur, vol, type) { if (audioCtx) toneAt(freq, audioCtx.currentTime + delay, dur, vol, type); }
+  function buzz(p) { if (navigator.vibrate) { try { navigator.vibrate(p); } catch (e) {} } }
+
+  function cueTick() { tone(700, 0, 0.14, 0.35, 'square'); }
+  function cueStart(type) {
+    if (type === 'work') { tone(990, 0, 0.18, 0.5); tone(1320, 0.18, 0.4, 0.5); buzz([120, 60, 120]); }
+    else if (type === 'prep') { tone(660, 0, 0.2, 0.4); }
+    else { tone(520, 0, 0.5, 0.45); buzz(250); }
+  }
+  function cueAlert() { tone(880, 0, 0.15, 0.45); tone(880, 0.22, 0.15, 0.45); buzz([100, 80, 100]); }
+  function cueFinish() {
+    [784, 988, 1175, 1568].forEach(function (f, i) { tone(f, i * 0.16, i === 3 ? 0.6 : 0.16, 0.5); });
+    buzz([200, 100, 200, 100, 400]);
+  }
+
+  // ===== 화면 꺼짐 방지 =====
+  var wakeLock = null;
+  function keepAwake() {
+    if (!navigator.wakeLock || wakeLock) return;
+    try {
+      navigator.wakeLock.request('screen').then(function (l) {
+        wakeLock = l;
+        l.addEventListener('release', function () { wakeLock = null; });
+      }).catch(function () {});
+    } catch (e) {}
+  }
+  function letSleep() { if (wakeLock) { try { wakeLock.release(); } catch (e) {} wakeLock = null; } }
+
+  // ===== 화면 전환 =====
+  var VIEWS = ['Setup', 'Weight', 'Log', 'Run', 'Done'];
+  function show(view) {
+    VIEWS.forEach(function (v) { $('view' + v).hidden = v.toLowerCase() !== view; });
+    document.body.dataset.view = view;
+    if (view !== 'run') delete document.body.dataset.phase;
+    $('tabbar').hidden = view === 'run' || view === 'done';
+    Array.prototype.forEach.call($('tabbar').children, function (b) {
+      if (b.dataset.tab === view) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
+    });
+    if (view === 'setup') renderSetup();
+    if (view === 'weight') renderWeight();
+    if (view === 'log') renderLog();
+    window.scrollTo(0, 0);
+  }
+  $('tabbar').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (b) show(b.dataset.tab);
+  });
+
+  // ===== 타이머 =====
+  // 남은 시간은 시각(ms) 기준으로 계산해서, 화면이 잠깐 멈춰도 밀리지 않는다.
+  var run = null;
+  var loopId = null;
+  var RING = 879.65;
+
+  function startWorkout() {
+    initAudio();
+    var c = cfgs[mode];
+    var steps = buildSteps(mode, c);
+    run = {
+      mode: mode, steps: steps,
+      name: mode === 'interval' ? (presetName() || '인터벌') : MODES[mode].label,
+      bpm: mode === 'rope' ? c.bpm : 0, alert: mode === 'run' ? c.alert : 0,
+      idx: 0, endsAt: 0, credited: 0, paused: false, pausedLeft: 0, nextBeat: 0,
+      total: 0, work: 0, rounds: 0, beatSec: 0, lastSec: -1
+    };
+    drawLine($('runLine'), steps);
+    var solo = mode === 'run';
+    $('runLine').classList.toggle('gone', solo);
+    $('prevBtn').classList.toggle('gone', solo);
+    $('nextBtn').classList.toggle('gone', solo);
+    show('run');
+    keepAwake();
+    enter(0, Date.now());
+    clearInterval(loopId);
+    loopId = setInterval(tick, 100);
+    tick();
+  }
+
+  function enter(idx, now) {
+    run.idx = idx;
+    run.endsAt = now + run.steps[idx].dur * 1000;
+    run.credited = now;
+    run.lastSec = -1;
+    run.nextBeat = audioCtx ? audioCtx.currentTime + 0.7 : 0;
+    cueStart(run.steps[idx].type);
+    renderStep();
+  }
+
+  function credit(until) {
+    var dt = Math.max(0, until - run.credited) / 1000;
+    run.total += dt;
+    if (run.steps[run.idx].type === 'work') { run.work += dt; if (run.bpm) run.beatSec += dt; }
+    run.credited = until;
+  }
+
+  function tick() {
+    if (!run || run.paused) return;
+    var now = Date.now();
+    while (now >= run.endsAt) {
+      var end = run.endsAt;
+      credit(end);
+      if (run.steps[run.idx].type === 'work') run.rounds += 1;
+      if (run.idx + 1 >= run.steps.length) { finish(false); return; }
+      enter(run.idx + 1, end);
+    }
+    credit(now);
+    beat(now);
+    renderClock(now);
+  }
+
+  // 줄넘기 박자: 오디오 시계에 조금 앞서 예약해 간격이 흔들리지 않게 한다.
+  function beat(now) {
+    var s = run.steps[run.idx];
+    if (!run.bpm || s.type !== 'work' || !soundOn || !audioCtx) return;
+    var t = audioCtx.currentTime;
+    if (run.nextBeat < t) run.nextBeat = t + 0.05;
+    var stepEnd = t + (run.endsAt - now) / 1000;
+    while (run.nextBeat < t + 0.3) {
+      if (run.nextBeat < stepEnd - 0.05) toneAt(1400, run.nextBeat, 0.04, 0.3, 'square');
+      run.nextBeat += 60 / run.bpm;
+    }
+  }
+
+  function renderStep() {
+    var s = run.steps[run.idx], n = run.steps[run.idx + 1];
+    document.body.dataset.phase = s.type;
+    $('phaseName').textContent = s.label;
+    $('runPos').textContent = s.pos || ' ';
+    if (run.mode === 'run') $('runNext').textContent = s.up ? (run.alert ? run.alert / 60 + '분마다 알림' : ' ') : '곧 러닝 시작';
+    else $('runNext').textContent = n ? '다음 ' + n.label + ' ' + words(n.dur) : '마지막 구간';
+    var segs = $('runLine').children;
+    for (var i = 0; i < segs.length; i++) {
+      segs[i].className = 'seg' + (i < run.idx ? ' done' : i === run.idx ? ' now' : '');
+    }
+  }
+
+  function renderClock(now) {
+    var s = run.steps[run.idx];
+    var leftMs = run.paused ? run.pausedLeft : Math.max(0, run.endsAt - now);
+    var left = Math.ceil(leftMs / 1000);
+    if (left !== run.lastSec) {
+      var shown = s.up ? s.dur - left : left;
+      if (!run.paused && run.lastSec !== -1) {
+        if (!s.open && left >= 1 && left <= 3 && s.dur > 3) cueTick();
+        else if (s.up && run.alert && shown > 0 && shown % run.alert === 0) cueAlert();
+      }
+      run.lastSec = left;
+      var el = $('clock');
+      el.textContent = (s.up || shown >= 60) ? clock(shown) : shown;
+      el.className = 'clock' + (shown >= 3600 ? ' xlong' : (s.up || shown >= 60) ? ' long' : '');
+      if (s.open) $('runLeft').textContent = ' ';
+      else if (run.mode === 'run') $('runLeft').textContent = s.up ? '남은 시간 ' + clock(left) : ' ';
+      else {
+        var rest = 0;
+        for (var i = run.idx + 1; i < run.steps.length; i++) rest += run.steps[i].dur;
+        $('runLeft').textContent = '전체 남은 시간 ' + clock(rest + left);
+      }
+    }
+    var frac = leftMs / (s.dur * 1000);
+    $('ring').style.strokeDashoffset = (RING * (s.open ? 1 : s.up ? frac : 1 - frac)).toFixed(1);
+  }
+
+  function setPaused(p) {
+    if (!run || run.paused === p) return;
+    var now = Date.now();
+    if (p) { credit(now); run.pausedLeft = Math.max(0, run.endsAt - now); letSleep(); }
+    else { run.endsAt = now + run.pausedLeft; run.credited = now; run.nextBeat = 0; keepAwake(); initAudio(); }
+    run.paused = p;
+    $('pauseBtn').textContent = p ? '계속' : '일시정지';
+    $('stopBtn').hidden = !p;
+    $('ringWrap').classList.toggle('paused', p);
+  }
+
+  function jump(dir) {
+    if (!run || run.mode === 'run') return;
+    var now = Date.now();
+    var wasPaused = run.paused;
+    if (!wasPaused) credit(now);
+    var s = run.steps[run.idx];
+    var leftMs = wasPaused ? run.pausedLeft : run.endsAt - now;
+    var target = run.idx + dir;
+    // 구간이 2초 넘게 지났으면 '이전'은 현재 구간을 처음부터 다시 시작
+    if (dir < 0 && (s.dur * 1000 - leftMs > 2000 || run.idx === 0)) target = run.idx;
+    if (target >= run.steps.length) { finish(true); return; }
+    enter(target, now);
+    if (wasPaused) run.pausedLeft = run.steps[target].dur * 1000;
+    renderClock(now);
+  }
+
+  // ===== 완료 =====
+  var doneRec = null;
+
+  function finish(early) {
+    if (!run) return;
+    if (!run.paused) credit(Math.min(Date.now(), run.endsAt));
+    clearInterval(loopId); loopId = null;
+    letSleep();
+    var r = run; run = null;
+    $('pauseBtn').textContent = '일시정지';
+    $('stopBtn').hidden = true;
+    $('ringWrap').classList.remove('paused');
+
+    if (r.total < 1) { show('setup'); return; }
+    cueFinish();
+    var open = r.steps[r.steps.length - 1].open;
+    doneRec = {
+      at: Date.now(), mode: r.mode, name: r.name,
+      total: Math.round(r.total), work: Math.round(r.work), rounds: r.rounds,
+      early: early && !open
+    };
+    if (r.mode === 'rope' && r.bpm) doneRec.count = Math.round(r.bpm * r.beatSec / 60);
+    doneRec.kcal = kcalOf(doneRec, latestKg());
+    log.unshift(doneRec);
+    log = log.slice(0, 60);
+    save('log', log);
+
+    $('doneTitle').textContent = doneRec.early ? '여기까지 했습니다' : r.name + ' 완료';
+    $('doneInputBlock').hidden = r.mode === 'interval';
+    var input = $('doneInput');
+    if (r.mode === 'rope') {
+      $('doneInputLabel').textContent = '줄넘기 횟수' + (doneRec.count ? ' (박자 기준 추정값, 고칠 수 있습니다)' : ' (세었다면 적어 두세요)');
+      $('doneInputUnit').textContent = '회';
+      input.step = '1'; input.inputMode = 'numeric'; input.placeholder = '예: 500';
+      input.value = doneRec.count || '';
+    } else if (r.mode === 'run') {
+      $('doneInputLabel').textContent = '달린 거리 (적으면 페이스를 계산합니다)';
+      $('doneInputUnit').textContent = 'km';
+      input.step = '0.01'; input.inputMode = 'decimal'; input.placeholder = '예: 5.0';
+      input.value = '';
+    }
+    $('againBtn').textContent = MODES[r.mode].label + ' 다시 하기';
+    renderDone();
+    show('done');
+  }
+
+  function renderDone() {
+    var r = doneRec, tiles;
+    var kcal = r.kcal ? String(r.kcal) : '—';
+    if (r.mode === 'run') {
+      var pace = '—';
+      if (r.km > 0) { var p = Math.round(r.work / r.km); pace = Math.floor(p / 60) + "'" + String(p % 60).padStart(2, '0') + '"'; }
+      tiles = [[clock(r.work), '러닝 시간'], [r.km > 0 ? String(r.km) : '—', '거리 km'], [pace, '1km 페이스'], [kcal, '추정 kcal']];
+    } else if (r.mode === 'rope') {
+      tiles = [[clock(r.total), '전체 시간'], [clock(r.work), '줄넘기 시간'], [r.count > 0 ? String(r.count) : r.rounds + '세트', r.count > 0 ? '횟수' : '완료 세트'], [kcal, '추정 kcal']];
+    } else {
+      tiles = [[clock(r.total), '전체 시간'], [clock(r.work), '운동 시간'], [String(r.rounds), '완료 라운드'], [kcal, '추정 kcal']];
+    }
+    $('doneStats').innerHTML = tiles.map(function (t) { return '<div class="stat"><b>' + t[0] + '</b><span>' + t[1] + '</span></div>'; }).join('');
+    $('doneNote').hidden = !!r.kcal;
+  }
+
+  $('doneInput').addEventListener('input', function () {
+    if (!doneRec) return;
+    var v = parseFloat(this.value);
+    if (!isFinite(v) || v < 0) v = 0;
+    if (doneRec.mode === 'rope') doneRec.count = Math.min(99999, Math.round(v));
+    else if (doneRec.mode === 'run') { doneRec.km = Math.min(999, Math.round(v * 100) / 100); doneRec.kcal = kcalOf(doneRec, latestKg()); }
+    save('log', log);
+    renderDone();
+  });
+
+  $('startBtn').addEventListener('click', startWorkout);
+  $('againBtn').addEventListener('click', function () { mode = doneRec ? doneRec.mode : mode; startWorkout(); });
+  $('backBtn').addEventListener('click', function () { show('setup'); });
+  $('pauseBtn').addEventListener('click', function () { if (run) setPaused(!run.paused); });
+  $('prevBtn').addEventListener('click', function () { jump(-1); });
+  $('nextBtn').addEventListener('click', function () { jump(1); });
+  $('stopBtn').addEventListener('click', function () { finish(true); });
+
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible' && run && !run.paused) { keepAwake(); initAudio(); tick(); }
+  });
+  document.addEventListener('keydown', function (e) {
+    if (!run || e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT') return;
+    if (e.code === 'Space') { e.preventDefault(); setPaused(!run.paused); }
+    else if (e.code === 'ArrowRight') jump(1);
+    else if (e.code === 'ArrowLeft') jump(-1);
+  });
+
+  renderRows();
+  show('setup');
+})();
+</script>
+</body>
+</html>
