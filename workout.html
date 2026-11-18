@@ -275,6 +275,13 @@
   .step-val.txt { font-family: var(--body); font-size: 17px; font-weight: 600; }
   .gone { visibility: hidden; }
 
+  .modes {
+    display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px;
+    background: var(--line); border-radius: 12px; padding: 4px;
+  }
+  .modes button { padding: 10px 4px; border-radius: 9px; font-weight: 600; color: var(--muted); }
+  .modes button[aria-pressed="true"] { background: var(--surface); color: var(--ink); }
+
   /* ===== 하단 탭 ===== */
   .tabbar {
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 5;
@@ -393,10 +400,27 @@
       <button type="button" class="toggle" id="soundBtn" aria-pressed="true">소리 켜짐</button>
     </div>
 
-    <div class="rows" id="rows"></div>
+    <div class="modes" id="kinds">
+      <button type="button" data-kind="burpee">버피테스트</button>
+      <button type="button" data-kind="other">다른 운동</button>
+    </div>
 
-    <div class="plan">
-      <button type="button" class="primary" id="startBtn">버피테스트 시작</button>
+    <div class="block" id="burpeeBox" style="gap:18px">
+      <div class="rows" id="rows"></div>
+      <div class="plan">
+        <button type="button" class="primary" id="startBtn">버피테스트 시작</button>
+      </div>
+    </div>
+
+    <div class="block" id="otherBox" hidden>
+      <h2>한 운동을 직접 기록</h2>
+      <form id="otherForm" class="field-row food-row">
+        <input type="text" id="oName" maxlength="20" placeholder="운동 종류" autocomplete="off" aria-label="운동 종류" required>
+        <input type="number" id="oMin" class="kcal" inputmode="numeric" min="1" max="600" step="1" placeholder="분" aria-label="운동 시간 (분)" required>
+        <input type="number" id="oKcal" class="kcal" inputmode="numeric" min="0" max="9999" step="1" placeholder="kcal" aria-label="소모 칼로리 (kcal)" required>
+        <button type="submit">추가</button>
+      </form>
+      <p class="note">오늘 날짜로 아래 운동 기록에 추가됩니다.</p>
     </div>
 
 
@@ -405,7 +429,7 @@
       <div class="stats three">
         <div class="stat"><b id="wkCount">0</b><span>운동 횟수</span></div>
         <div class="stat"><b id="wkTime">0:00</b><span>운동한 시간</span></div>
-        <div class="stat"><b id="wkKcal">—</b><span>추정 kcal</span></div>
+        <div class="stat"><b id="wkKcal">—</b><span>소모 kcal</span></div>
       </div>
     </div>
     <div class="block">
@@ -1046,7 +1070,7 @@
     drawDietChart(goal);
 
     var burn = log.reduce(function (a, r) { return a + (dateStr(new Date(r.at)) === dietDate ? (r.kcal || 0) : 0); }, 0);
-    $('dBurnLine').textContent = burn ? '이 날 운동으로 약 ' + num(burn) + 'kcal 소모 · 섭취에서 빼면 ' + num(total - burn) + 'kcal' : '';
+    $('dBurnLine').textContent = burn ? '이 날 운동으로 약 ' + num(burn) + 'kcal 소모' + (total ? ' · 섭취에서 빼면 ' + (total < burn ? '−' : '') + num(Math.abs(total - burn)) + 'kcal' : '') : '';
     $('dBurnLine').hidden = !burn;
 
     $('dMeals').innerHTML = MEALS.map(function (m) {
@@ -1155,10 +1179,40 @@
     $('gSaved').hidden = false;
   });
 
+  // ===== 버피테스트 / 다른 운동 구분 =====
+  var kind = load('kind', 'burpee') === 'other' ? 'other' : 'burpee';
+  function renderKind() {
+    Array.prototype.forEach.call($('kinds').children, function (b) {
+      b.setAttribute('aria-pressed', String(b.dataset.kind === kind));
+    });
+    $('burpeeBox').hidden = kind !== 'burpee';
+    $('otherBox').hidden = kind !== 'other';
+  }
+  $('kinds').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    kind = b.dataset.kind;
+    save('kind', kind);
+    renderKind();
+  });
+  $('otherForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var name = $('oName').value.trim();
+    var min = Math.round(parseFloat($('oMin').value)), k = Math.round(parseFloat($('oKcal').value));
+    if (!name) { $('oName').focus(); return; }
+    if (!isFinite(min) || min < 1 || min > 600) { $('oMin').focus(); return; }
+    if (!isFinite(k) || k < 0 || k > 9999) { $('oKcal').focus(); return; }
+    log.unshift({ at: Date.now(), mode: 'other', name: name, total: min * 60, work: min * 60, rounds: 0, kcal: k });
+    log = log.slice(0, 60);
+    save('log', log);
+    $('oName').value = ''; $('oMin').value = ''; $('oKcal').value = '';
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    renderLog();
+  });
+
   // ===== 기록 화면 =====
   function recLine(r) {
     var m = r.mode || 'interval';
-    var title = OLD_LABELS[m] || MODES.interval.label;
+    var title = m === 'other' ? (r.name || '다른 운동') : OLD_LABELS[m] || MODES.interval.label;
     var bits = [clock(m === 'run' ? r.work : r.total)];
     if (m === 'interval') bits.push(r.rounds + '라운드');
     if (m === 'rope') bits.push(r.count > 0 ? r.count + '회' : r.rounds + '세트');
@@ -1249,7 +1303,7 @@
     Array.prototype.forEach.call($('tabbar').children, function (b) {
       if (b.dataset.tab === view) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
     });
-    if (view === 'setup') { renderSetup(); renderLog(); }
+    if (view === 'setup') { renderSetup(); renderKind(); renderLog(); }
     if (view === 'weight') renderWeight();
     if (view === 'diet') { $('fMeal').value = defaultMeal(); renderDiet(); }
     if (view === 'settings') { $('gSaved').hidden = true; renderSettings(); }
