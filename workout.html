@@ -366,7 +366,7 @@
     <div class="rows" id="rows"></div>
 
     <div class="plan">
-      <div class="plan-top">
+      <div class="plan-top" id="planTop">
         <div class="plan-total" id="planTotal">0:00</div>
         <div class="plan-sub" id="planSub"></div>
       </div>
@@ -669,7 +669,8 @@
     }
     $('planTotal').textContent = total;
     $('planSub').textContent = sub;
-    $('planLine').hidden = mode === 'run';
+    $('planLine').hidden = mode !== 'rope';
+    $('planTop').hidden = mode === 'interval';
     drawLine($('planLine'), steps);
     $('startBtn').textContent = MODES[mode].label + ' 시작';
 
