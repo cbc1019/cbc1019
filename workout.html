@@ -368,6 +368,8 @@
     flex: none;
   }
   .field-row input.kcal { flex: 0 0 84px; }
+  .field-row label { flex: 0 0 76px; font-size: 14px; color: var(--muted); }
+  .field-row select.wide { flex: 1; min-width: 0; }
   .meal-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
   .meal-head .num { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
 
@@ -516,11 +518,38 @@
     <p class="empty" id="dEmpty">이 날 기록한 음식이 없습니다.</p>
 
     <div class="block">
-      <h2 id="gLabel">목표 체중</h2>
-      <form class="field-row" id="goalForm">
-        <input type="number" id="tKg" inputmode="decimal" min="30" max="200" step="0.1" placeholder="예: 68" aria-labelledby="gLabel" required>
-        <span class="unit">kg</span>
-        <button type="submit">저장</button>
+      <h2>목표와 내 정보</h2>
+      <form class="block" id="goalForm">
+        <div class="field-row">
+          <label for="tKg">목표 체중</label>
+          <input type="number" id="tKg" inputmode="decimal" min="30" max="200" step="0.1" placeholder="예: 68" required>
+          <span class="unit">kg</span>
+        </div>
+        <div class="field-row">
+          <label for="pAge">나이</label>
+          <input type="number" id="pAge" inputmode="numeric" min="10" max="100" step="1" placeholder="예: 40">
+          <span class="unit">세</span>
+        </div>
+        <div class="field-row">
+          <label for="pSex">성별</label>
+          <select id="pSex" class="wide">
+            <option value="">선택</option>
+            <option value="m">남성</option>
+            <option value="f">여성</option>
+          </select>
+        </div>
+        <div class="field-row">
+          <label for="pAct">활동량</label>
+          <select id="pAct" class="wide">
+            <option value="">선택</option>
+            <option value="1.2">거의 앉아서 생활</option>
+            <option value="1.375">가벼운 활동 (주 1~3회 운동)</option>
+            <option value="1.55">보통 (주 3~5회 운동)</option>
+            <option value="1.725">활동적 (주 6~7회 운동)</option>
+            <option value="1.9">매우 활동적 (육체노동·매일 강한 운동)</option>
+          </select>
+        </div>
+        <div class="field-row"><span style="flex:1"></span><button type="submit">저장</button></div>
       </form>
       <p class="note" id="gHint"></p>
     </div>
@@ -904,6 +933,7 @@
   ];
   var meals = load('meals', {});
   var targetKg = Number(load('targetKg', 0)) || 0;
+  var profile = load('profile', {}) || {};
   var dietDate = dateStr(new Date());
   var autoKcal = '';
 
@@ -915,17 +945,31 @@
   }
   function num(n) { return String(Math.round(n)).replace(/\B(?=(\d{3})+$)/g, ','); }
 
-  // 하루 목표 열량: 목표 체중 × 30kcal. 현재 체중 유지 열량(체중 × 30)에서 500kcal 넘게 벗어나지 않게 하고 1,200kcal 아래로는 내리지 않는다.
+  // 하루 목표 열량: 목표 체중에서의 하루 소모 열량.
+  // 나이·성별·키·활동량이 모두 있으면 미플린-세인트 지어 공식(기초대사량 × 활동 계수), 없으면 체중 × 30kcal로 어림한다.
+  // 현재 체중 유지 열량에서 500kcal 넘게 벗어나지 않게 하고, 최저선(남 1,500 · 여 1,200kcal) 아래로는 내리지 않는다.
   function goalInfo() {
     if (!targetKg) return null;
-    var cur = latestKg(), g = targetKg * 30, capped = false, floor = false;
-    if (cur) {
-      var maint = cur * 30;
+    var cur = latestKg();
+    var act = Number(profile.act) || 0, age = Number(profile.age) || 0, sex = profile.sex;
+    var missing = [];
+    if (!cur) missing.push('현재 체중(체중 탭)');
+    if (!heightCm) missing.push('키(체중 탭)');
+    if (!age) missing.push('나이');
+    if (sex !== 'm' && sex !== 'f') missing.push('성별');
+    if (!act) missing.push('활동량');
+    var full = !missing.length;
+    var need = function (kg) {
+      return full ? (10 * kg + 6.25 * heightCm - 5 * age + (sex === 'm' ? 5 : -161)) * act : kg * 30;
+    };
+    var raw = need(targetKg), g = raw, maint = cur ? need(cur) : 0, capped = false, floored = false;
+    if (maint) {
       if (g < maint - 500) { g = maint - 500; capped = true; }
       if (g > maint + 500) { g = maint + 500; capped = true; }
     }
-    if (g < 1200) { g = 1200; floor = true; }
-    return { kcal: Math.round(g / 10) * 10, capped: capped, floor: floor, cur: cur };
+    var floor = sex === 'm' ? 1500 : 1200;
+    if (g < floor) { g = floor; floored = true; }
+    return { kcal: Math.round(g / 10) * 10, raw: raw, maint: maint, capped: capped, floored: floored, floor: floor, cur: cur, full: full, missing: missing };
   }
   function dayTotal(d) { return (meals[d] || []).reduce(function (a, it) { return a + it.k; }, 0); }
 
@@ -1030,18 +1074,21 @@
     $('dEmpty').hidden = items.length > 0;
 
     if (targetKg && document.activeElement !== $('tKg')) $('tKg').value = targetKg;
+    if (profile.age && document.activeElement !== $('pAge')) $('pAge').value = profile.age;
+    $('pSex').value = profile.sex || '';
+    $('pAct').value = profile.act ? String(profile.act) : '';
     var hint;
-    if (!gi) hint = '목표 체중을 저장하면 "목표 체중 × 30kcal"로 하루 목표 열량을 정합니다.';
+    if (!gi) hint = '목표 체중과 내 정보를 저장하면 하루 목표 열량을 계산합니다. 키와 현재 체중은 체중 탭에서 입력합니다.';
     else {
       hint = '하루 목표 ' + num(goal) + 'kcal. ';
-      if (gi.capped) hint += '목표 체중 기준으로는 ' + num(targetKg * 30) + 'kcal이지만, 무리가 되지 않게 현재 체중 유지 열량(' + num(gi.cur * 30) + 'kcal)에서 500kcal까지만 조정했습니다. ';
-      else if (gi.floor) hint += '하루 1,200kcal 아래로는 잡지 않습니다. ';
-      else hint += '목표 체중 ' + fmtKg(targetKg) + 'kg × 30kcal로 계산했습니다. ';
+      if (gi.full) hint += '나이·성별·키·활동량으로 계산한 값입니다. 현재 체중 유지에는 하루 약 ' + num(gi.maint) + 'kcal, 목표 체중 ' + fmtKg(targetKg) + 'kg 유지에는 약 ' + num(gi.raw) + 'kcal가 필요합니다. ';
+      else hint += '아직 "체중 × 30kcal"로 어림한 값입니다. 나이·성별·활동량을 반영하려면 다음을 입력하세요: ' + gi.missing.join(', ') + '. ';
+      if (gi.floored) hint += '너무 낮아지지 않게 하루 ' + num(gi.floor) + 'kcal를 최저선으로 잡았습니다. ';
+      else if (gi.capped) hint += '무리가 되지 않게 현재 유지 열량에서 500kcal까지만 조정했습니다. ';
       if (gi.cur) {
         var diff = Math.round((targetKg - gi.cur) * 10) / 10;
-        hint += diff === 0 ? '현재 체중이 목표와 같습니다. ' : '현재 ' + fmtKg(gi.cur) + 'kg에서 ' + Math.abs(diff).toFixed(1) + 'kg ' + (diff < 0 ? '감량' : '증량') + '이 목표입니다. ';
-      } else hint += '체중 탭에서 현재 체중을 기록하면 더 맞게 조정합니다. ';
-      hint += '나이·성별·활동량은 반영하지 않은 어림값입니다.';
+        hint += diff === 0 ? '현재 체중이 목표와 같습니다.' : '현재 ' + fmtKg(gi.cur) + 'kg에서 ' + Math.abs(diff).toFixed(1) + 'kg ' + (diff < 0 ? '감량' : '증량') + '이 목표입니다.';
+      }
     }
     $('gHint').textContent = hint;
   }
@@ -1081,9 +1128,13 @@
     e.preventDefault();
     var t = Math.round(parseFloat($('tKg').value) * 10) / 10;
     if (!isFinite(t) || t < 30 || t > 200) { $('tKg').focus(); return; }
+    var age = Math.round(parseFloat($('pAge').value));
+    if ($('pAge').value !== '' && (!isFinite(age) || age < 10 || age > 100)) { $('pAge').focus(); return; }
     targetKg = t;
+    profile = { age: isFinite(age) ? age : 0, sex: $('pSex').value, act: Number($('pAct').value) || 0 };
     save('targetKg', t);
-    $('tKg').blur();
+    save('profile', profile);
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
     renderDiet();
   });
 
