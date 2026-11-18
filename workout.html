@@ -391,6 +391,20 @@
       <button type="submit">기록</button>
     </form>
 
+    <div class="block">
+      <h2 id="hLabel">키</h2>
+      <form class="field-row" id="heightForm">
+        <input type="number" id="hCm" inputmode="decimal" step="0.1" min="100" max="250" placeholder="예: 170" aria-labelledby="hLabel" required>
+        <span class="unit">cm</span>
+        <button type="submit">저장</button>
+      </form>
+      <div class="stats" id="bmiStats" hidden>
+        <div class="stat"><b id="bmiNum">—</b><span id="bmiLabel">BMI</span></div>
+        <div class="stat"><b id="bmiRange">—</b><span>정상 체중 범위 kg</span></div>
+      </div>
+      <p class="note" id="bmiNote">키와 체중을 모두 기록하면 BMI를 계산합니다.</p>
+    </div>
+
     <div class="card">
       <div class="card-top">
         <div class="card-title" id="chartTitle">체중 추이</div>
@@ -476,8 +490,8 @@
 </main>
 
 <nav class="tabbar" id="tabbar" aria-label="화면">
-  <button type="button" data-tab="setup">운동</button>
   <button type="button" data-tab="weight">체중</button>
+  <button type="button" data-tab="setup">운동</button>
   <button type="button" data-tab="log">기록</button>
 </nav>
 
@@ -580,6 +594,7 @@
   var soundOn = load('sound', true);
   var weights = loadWeights();
   var rangeDays = load('range', 30);
+  var heightCm = Number(load('height', 0)) || 0;
 
   function weightEntries() {
     return Object.keys(weights).sort().map(function (d) {
@@ -739,6 +754,19 @@
     $('wDate').max = dateStr(new Date());
     if (last) $('wKg').placeholder = fmtKg(last.kg);
 
+    // BMI (대한비만학회 기준: 18.5 미만 저체중, 23 미만 정상, 25 미만 비만 전단계, 그 이상 비만)
+    if (heightCm && document.activeElement !== $('hCm')) $('hCm').value = heightCm;
+    var hasBmi = !!(heightCm && last);
+    $('bmiStats').hidden = !hasBmi;
+    $('bmiNote').hidden = hasBmi;
+    if (hasBmi) {
+      var m2 = heightCm * heightCm / 10000, bmi = last.kg / m2;
+      var cat = bmi < 18.5 ? '저체중' : bmi < 23 ? '정상' : bmi < 25 ? '비만 전단계' : '비만';
+      $('bmiNum').textContent = bmi.toFixed(1);
+      $('bmiLabel').textContent = 'BMI · ' + cat;
+      $('bmiRange').textContent = (18.5 * m2).toFixed(1) + '–' + (22.9 * m2).toFixed(1);
+    }
+
     Array.prototype.forEach.call($('ranges').children, function (b) {
       b.setAttribute('aria-pressed', String(Number(b.dataset.days) === rangeDays));
     });
@@ -840,6 +868,15 @@
     saveWeights(weights);
     $('wKg').value = '';
     $('wKg').blur();
+    renderWeight();
+  });
+  $('heightForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var h = Math.round(parseFloat($('hCm').value) * 10) / 10;
+    if (!isFinite(h) || h < 100 || h > 250) { $('hCm').focus(); return; }
+    heightCm = h;
+    save('height', h);
+    $('hCm').blur();
     renderWeight();
   });
   $('wList').addEventListener('click', function (e) {
@@ -1167,7 +1204,8 @@
   });
 
   renderRows();
-  show('setup');
+  renderSetup();
+  show('weight');
 })();
 </script>
 </body>
