@@ -1316,15 +1316,40 @@
 
   // ===== 소리 · 진동 =====
   var audioCtx = null;
+  var audioStale = false;   // 화면을 떠났다 돌아오면 true: 다음 터치 때 오디오를 새로 만든다
+  function newAudio() {
+    var Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return;
+    if (audioCtx) { try { audioCtx.close(); } catch (e) {} }
+    audioCtx = new Ctx();
+    audioStale = false;
+  }
   function initAudio() {
     try {
-      if (!audioCtx) {
-        var Ctx = window.AudioContext || window.webkitAudioContext;
-        if (Ctx) audioCtx = new Ctx();
-      }
-      if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+      if (!audioCtx || audioCtx.state === 'closed') newAudio();
+      // 아이폰은 앱을 나갔다 오면 'interrupted' 상태가 되므로 'suspended'만이 아니라 running이 아닌 모든 경우에 다시 켠다.
+      if (audioCtx && audioCtx.state !== 'running') { var pr = audioCtx.resume(); if (pr && pr.catch) pr.catch(function () {}); }
     } catch (e) {}
   }
+  // 아이폰 Safari는 화면을 떠났다 돌아오면 오디오가 멈추고, 사용자가 화면을 눌러야만 다시 켤 수 있다.
+  // 그래서 돌아온 뒤 첫 터치에서 오디오를 새로 만들고 무음 한 번을 재생해 잠금을 푼다.
+  function unlockAudio() {
+    if (!soundOn) return;
+    try {
+      if (audioStale || !audioCtx || audioCtx.state === 'closed') newAudio();
+      if (!audioCtx) return;
+      if (audioCtx.state !== 'running') { var pr = audioCtx.resume(); if (pr && pr.catch) pr.catch(function () {}); }
+      var src = audioCtx.createBufferSource();
+      src.buffer = audioCtx.createBuffer(1, 1, 22050);
+      src.connect(audioCtx.destination);
+      src.start(0);
+    } catch (e) {}
+  }
+  ['touchend', 'pointerup', 'click', 'keydown'].forEach(function (t) { document.addEventListener(t, unlockAudio, true); });
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'hidden') audioStale = true;
+  });
+  window.addEventListener('pageshow', function (e) { if (e.persisted) audioStale = true; });
   function toneAt(freq, t, dur, vol, type) {
     if (!soundOn || !audioCtx) return;
     try {
