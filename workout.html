@@ -276,7 +276,7 @@
   .gone { visibility: hidden; }
 
   .modes {
-    display: grid; grid-template-columns: 1.35fr 1fr 1fr 1fr; gap: 4px;
+    display: grid; grid-template-columns: 1fr 1fr; gap: 4px;
     background: var(--line); border-radius: 12px; padding: 4px;
   }
   .modes button { padding: 10px 2px; white-space: nowrap; border-radius: 9px; font-weight: 600; color: var(--muted); }
@@ -379,6 +379,16 @@
   .food-row select { padding: 10px 4px; }
   .food-row input { padding: 10px 8px; }
   .food-row button { padding: 10px 14px; }
+  .pick { position: relative; flex: 1.2; min-width: 0; display: flex; }
+  .pick input { width: 100%; }
+  .pick-menu {
+    position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 4;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.12); overflow: hidden;
+    display: flex; flex-direction: column;
+  }
+  .field-row .pick-menu button { background: none; color: var(--ink); border-radius: 0; padding: 12px; text-align: left; font-weight: 500; }
+  .field-row .pick-menu button + button { border-top: 1px solid var(--line); }
   .chip .k { color: var(--muted); margin-left: 6px; font-variant-numeric: tabular-nums; }
   .field-row label { flex: 0 0 76px; font-size: 14px; color: var(--muted); }
   .field-row select.wide { flex: 1; min-width: 0; }
@@ -402,8 +412,6 @@
 
     <div class="modes" id="kinds">
       <button type="button" data-kind="burpee">버피테스트</button>
-      <button type="button" data-kind="rope">줄넘기</button>
-      <button type="button" data-kind="run">러닝</button>
       <button type="button" data-kind="other">기타</button>
     </div>
 
@@ -415,9 +423,15 @@
     </div>
 
     <div class="block" id="otherBox" hidden>
-      <h2 id="oTitle">한 운동을 직접 기록</h2>
+      <h2>기타 운동 직접 기록</h2>
       <form id="otherForm" class="field-row food-row">
-        <input type="text" id="oName" maxlength="20" placeholder="운동 종류" autocomplete="off" aria-label="운동 종류">
+        <div class="pick">
+          <input type="text" id="oName" maxlength="20" placeholder="운동 종류" autocomplete="off" aria-label="운동 종류">
+          <div class="pick-menu" id="oMenu" hidden>
+            <button type="button">줄넘기</button>
+            <button type="button">러닝</button>
+          </div>
+        </div>
         <input type="number" id="oMin" inputmode="numeric" min="1" max="600" step="1" placeholder="시간(분)" aria-label="운동 시간 (분)" required>
         <input type="number" id="oKcal" inputmode="numeric" min="0" max="9999" step="1" placeholder="kcal" aria-label="소모 칼로리 (kcal)" required>
         <button type="submit">추가</button>
@@ -1182,17 +1196,13 @@
   });
 
   // ===== 버피테스트 / 다른 운동 구분 =====
-  var KIND_NAMES = { burpee: '버피테스트', rope: '줄넘기', run: '러닝', other: '기타' };
-  var kind = load('kind', 'burpee');
-  if (!KIND_NAMES[kind]) kind = 'burpee';
+  var kind = load('kind', 'burpee') === 'burpee' ? 'burpee' : 'other';
   function renderKind() {
     Array.prototype.forEach.call($('kinds').children, function (b) {
       b.setAttribute('aria-pressed', String(b.dataset.kind === kind));
     });
     $('burpeeBox').hidden = kind !== 'burpee';
     $('otherBox').hidden = kind === 'burpee';
-    $('oName').hidden = kind !== 'other';
-    $('oTitle').textContent = (kind === 'other' ? '기타 운동' : KIND_NAMES[kind]) + ' 직접 기록';
   }
   $('kinds').addEventListener('click', function (e) {
     var b = e.target.closest('button'); if (!b) return;
@@ -1200,9 +1210,21 @@
     save('kind', kind);
     renderKind();
   });
+  // 운동 종류 칸을 누르면 줄넘기·러닝을 고를 수 있다 (직접 적어도 된다).
+  $('oName').addEventListener('focus', function () { $('oMenu').hidden = false; });
+  $('oName').addEventListener('click', function () { $('oMenu').hidden = false; });
+  $('oName').addEventListener('blur', function () { $('oMenu').hidden = true; });
+  $('oName').addEventListener('input', function () { $('oMenu').hidden = this.value !== ''; });
+  $('oMenu').addEventListener('pointerdown', function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    e.preventDefault();
+    $('oName').value = b.textContent;
+    $('oMenu').hidden = true;
+    $('oMin').focus();
+  });
   $('otherForm').addEventListener('submit', function (e) {
     e.preventDefault();
-    var name = kind === 'other' ? $('oName').value.trim() : KIND_NAMES[kind];
+    var name = $('oName').value.trim();
     var min = Math.round(parseFloat($('oMin').value)), k = Math.round(parseFloat($('oKcal').value));
     if (!name) { $('oName').focus(); return; }
     if (!isFinite(min) || min < 1 || min > 600) { $('oMin').focus(); return; }
