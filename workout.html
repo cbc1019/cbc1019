@@ -276,10 +276,10 @@
   .gone { visibility: hidden; }
 
   .modes {
-    display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px;
+    display: grid; grid-template-columns: 1.35fr 1fr 1fr 1fr; gap: 4px;
     background: var(--line); border-radius: 12px; padding: 4px;
   }
-  .modes button { padding: 10px 4px; border-radius: 9px; font-weight: 600; color: var(--muted); }
+  .modes button { padding: 10px 2px; white-space: nowrap; border-radius: 9px; font-weight: 600; color: var(--muted); }
   .modes button[aria-pressed="true"] { background: var(--surface); color: var(--ink); }
 
   /* ===== 하단 탭 ===== */
@@ -402,7 +402,9 @@
 
     <div class="modes" id="kinds">
       <button type="button" data-kind="burpee">버피테스트</button>
-      <button type="button" data-kind="other">다른 운동</button>
+      <button type="button" data-kind="rope">줄넘기</button>
+      <button type="button" data-kind="run">러닝</button>
+      <button type="button" data-kind="other">기타</button>
     </div>
 
     <div class="block" id="burpeeBox" style="gap:18px">
@@ -413,11 +415,11 @@
     </div>
 
     <div class="block" id="otherBox" hidden>
-      <h2>한 운동을 직접 기록</h2>
+      <h2 id="oTitle">한 운동을 직접 기록</h2>
       <form id="otherForm" class="field-row food-row">
-        <input type="text" id="oName" maxlength="20" placeholder="운동 종류" autocomplete="off" aria-label="운동 종류" required>
-        <input type="number" id="oMin" class="kcal" inputmode="numeric" min="1" max="600" step="1" placeholder="분" aria-label="운동 시간 (분)" required>
-        <input type="number" id="oKcal" class="kcal" inputmode="numeric" min="0" max="9999" step="1" placeholder="kcal" aria-label="소모 칼로리 (kcal)" required>
+        <input type="text" id="oName" maxlength="20" placeholder="운동 종류" autocomplete="off" aria-label="운동 종류">
+        <input type="number" id="oMin" inputmode="numeric" min="1" max="600" step="1" placeholder="시간(분)" aria-label="운동 시간 (분)" required>
+        <input type="number" id="oKcal" inputmode="numeric" min="0" max="9999" step="1" placeholder="kcal" aria-label="소모 칼로리 (kcal)" required>
         <button type="submit">추가</button>
       </form>
       <p class="note">오늘 날짜로 아래 운동 기록에 추가됩니다.</p>
@@ -1180,13 +1182,17 @@
   });
 
   // ===== 버피테스트 / 다른 운동 구분 =====
-  var kind = load('kind', 'burpee') === 'other' ? 'other' : 'burpee';
+  var KIND_NAMES = { burpee: '버피테스트', rope: '줄넘기', run: '러닝', other: '기타' };
+  var kind = load('kind', 'burpee');
+  if (!KIND_NAMES[kind]) kind = 'burpee';
   function renderKind() {
     Array.prototype.forEach.call($('kinds').children, function (b) {
       b.setAttribute('aria-pressed', String(b.dataset.kind === kind));
     });
     $('burpeeBox').hidden = kind !== 'burpee';
-    $('otherBox').hidden = kind !== 'other';
+    $('otherBox').hidden = kind === 'burpee';
+    $('oName').hidden = kind !== 'other';
+    $('oTitle').textContent = (kind === 'other' ? '기타 운동' : KIND_NAMES[kind]) + ' 직접 기록';
   }
   $('kinds').addEventListener('click', function (e) {
     var b = e.target.closest('button'); if (!b) return;
@@ -1196,7 +1202,7 @@
   });
   $('otherForm').addEventListener('submit', function (e) {
     e.preventDefault();
-    var name = $('oName').value.trim();
+    var name = kind === 'other' ? $('oName').value.trim() : KIND_NAMES[kind];
     var min = Math.round(parseFloat($('oMin').value)), k = Math.round(parseFloat($('oKcal').value));
     if (!name) { $('oName').focus(); return; }
     if (!isFinite(min) || min < 1 || min > 600) { $('oMin').focus(); return; }
@@ -1212,7 +1218,7 @@
   // ===== 기록 화면 =====
   function recLine(r) {
     var m = r.mode || 'interval';
-    var title = m === 'other' ? (r.name || '다른 운동') : OLD_LABELS[m] || MODES.interval.label;
+    var title = m === 'other' ? (r.name || '기타') : OLD_LABELS[m] || MODES.interval.label;
     var bits = [clock(m === 'run' ? r.work : r.total)];
     if (m === 'interval') bits.push(r.rounds + '라운드');
     if (m === 'rope') bits.push(r.count > 0 ? r.count + '회' : r.rounds + '세트');
