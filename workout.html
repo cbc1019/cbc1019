@@ -745,11 +745,24 @@
   function latestKg() { var e = weightEntries(); return e.length ? e[e.length - 1].kg : null; }
 
   // ===== 칼로리 추정 (MET) =====
+  var BURPEE_MET = 10.0;   // 버피 운동 구간 강도 (휴식·준비는 3.5)
+  // 강도 8.0으로 저장된 예전 버피테스트 기록을 새 강도 기준으로 한 번만 다시 계산한다.
+  (function () {
+    var changed = false;
+    log.forEach(function (r) {
+      if ((r.mode || 'interval') !== 'interval' || !r.kcal || r.met) return;
+      var rest = Math.max(0, r.total - r.work), old = 8.0 * r.work + 3.5 * rest;
+      if (old > 0) r.kcal = Math.round(r.kcal * (BURPEE_MET * r.work + 3.5 * rest) / old);
+      r.met = BURPEE_MET;
+      changed = true;
+    });
+    if (changed) save('log', log);
+  })();
   function kcalOf(r, kg) {
     if (!kg) return null;
     var m = r.mode || 'interval', restSec = Math.max(0, r.total - r.work);
     if (m === 'run') return Math.round(r.km > 0 ? kg * r.km * 1.036 : 9.0 * kg * r.work / 3600);
-    var met = m === 'rope' ? 11.0 : 8.0;
+    var met = m === 'rope' ? 11.0 : BURPEE_MET;
     return Math.round((met * r.work + 3.5 * restSec) * kg / 3600);
   }
 
@@ -1514,7 +1527,7 @@
     cueFinish();
     doneRec = {
       at: Date.now(), mode: r.mode, name: r.name,
-      total: Math.round(r.total), work: Math.round(r.work), rounds: r.rounds
+      total: Math.round(r.total), work: Math.round(r.work), rounds: r.rounds, met: BURPEE_MET
     };
     doneRec.kcal = kcalOf(doneRec, latestKg());
     log.unshift(doneRec);
