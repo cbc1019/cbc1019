@@ -570,13 +570,10 @@
           <label for="pWeeks">달성 기간</label>
           <select id="pWeeks" class="wide">
             <option value="">정하지 않음</option>
-            <option value="4">4주 (1개월)</option>
-            <option value="8">8주 (2개월)</option>
-            <option value="12">12주 (3개월)</option>
-            <option value="16">16주 (4개월)</option>
-            <option value="24">24주 (6개월)</option>
-            <option value="36">36주 (9개월)</option>
-            <option value="52">52주 (1년)</option>
+            <option value="1">1개월</option>
+            <option value="3">3개월</option>
+            <option value="6">6개월</option>
+            <option value="12">12개월</option>
           </select>
         </div>
         <div class="field-row">
@@ -977,6 +974,7 @@
   var meals = load('meals', {});
   var targetKg = Number(load('targetKg', 0)) || 0;
   var profile = load('profile', {}) || {};
+  if (profile.weeks && !profile.months) profile.months = { 4: 1, 12: 3, 24: 6, 52: 12 }[profile.weeks] || 0;
   var dietDate = dateStr(new Date());
 
   function shiftDate(d, days) {
@@ -1007,14 +1005,13 @@
       return full ? (10 * kg + 6.25 * heightCm - 5 * age + (sex === 'm' ? 5 : -161)) * act : kg * 30;
     };
     var raw = need(targetKg), g = raw, maint = cur ? need(cur) : 0, capped = false, floored = false, plan = null, expired = false;
-    var weeks = Number(profile.weeks) || 0;
-    if (cur && weeks && profile.deadline) {
+    if (cur && profile.months && profile.deadline) {
       var daysLeft = Math.round((dayMs(profile.deadline) - dayMs(dateStr(new Date()))) / 86400000);
       if (daysLeft >= 1) {
         var perDay = (cur - targetKg) * KCAL_PER_KG / daysLeft, want = Math.abs(perDay);
         if (Math.abs(perDay) > 1000) { perDay = perDay > 0 ? 1000 : -1000; capped = true; }
         g = maint - perDay;
-        plan = { weeks: weeks, deadline: profile.deadline, daysLeft: daysLeft, want: Math.round(want / 10) * 10 };
+        plan = { deadline: profile.deadline, daysLeft: daysLeft, want: Math.round(want / 10) * 10 };
       } else expired = true;
     }
     if (!plan && maint) {
@@ -1157,7 +1154,7 @@
     if (profile.age && document.activeElement !== $('pAge')) $('pAge').value = profile.age;
     $('pSex').value = profile.sex || '';
     $('pAct').value = profile.act ? String(profile.act) : '';
-    $('pWeeks').value = profile.weeks ? String(profile.weeks) : '';
+    $('pWeeks').value = profile.months ? String(profile.months) : '';
     var hint;
     if (!gi) hint = '목표 체중과 내 정보를 저장하면 하루 목표 열량을 계산합니다. 현재 체중은 체중 탭에서 기록합니다.';
     else {
@@ -1172,7 +1169,7 @@
         else if (gi.capped) hint += '무리가 되지 않게 하루 조정 폭을 1,000kcal로 제한했고, 이 속도로는 ' + span(gi.realDays) + '가 걸립니다. ';
       } else {
         if (gi.expired) hint += '정해 둔 목표일이 지났습니다. 달성 기간을 다시 선택해 저장해 주세요. ';
-        else if (!profile.weeks) hint += '달성 기간을 정하지 않아 목표 체중 ' + fmtKg(targetKg) + 'kg을 유지하는 열량으로 잡았습니다. ';
+        else if (!profile.months) hint += '달성 기간을 정하지 않아 목표 체중 ' + fmtKg(targetKg) + 'kg을 유지하는 열량으로 잡았습니다. ';
         if (gi.floored) hint += '너무 낮아지지 않게 하루 ' + num(gi.floor) + 'kcal를 최저선으로 잡았습니다. ';
         else if (gi.capped) hint += '무리가 되지 않게 현재 유지 열량에서 500kcal까지만 조정했습니다. ';
         if (gi.cur) hint += diff === 0 ? '현재 체중이 목표와 같습니다. ' : '현재 ' + fmtKg(gi.cur) + 'kg에서 ' + move + '이 목표' + (gi.realDays && !gi.expired ? '이고, 이 열량이면 ' + span(gi.realDays) + ' 걸립니다. ' : '입니다. ');
@@ -1227,12 +1224,13 @@
     if (bad($('hCm'), h, 100, 250)) { $('hCm').focus(); return; }
     if (bad($('pAge'), age, 10, 100)) { $('pAge').focus(); return; }
     heightCm = isFinite(h) ? h : 0;
-    var weeks = Number($('pWeeks').value) || 0, newTarget = isFinite(t) ? t : 0;
+    var months = Number($('pWeeks').value) || 0, newTarget = isFinite(t) ? t : 0;
     // 기간이나 목표 체중을 바꾸면 오늘부터 다시 센다. 그대로면 처음 정한 목표일을 유지한다.
-    var deadline = weeks && weeks === Number(profile.weeks) && newTarget === targetKg && profile.deadline
-      ? profile.deadline : (weeks ? shiftDate(dateStr(new Date()), weeks * 7) : '');
+    var deadline = '';
+    if (months && months === Number(profile.months) && newTarget === targetKg && profile.deadline) deadline = profile.deadline;
+    else if (months) { var end = new Date(); end.setMonth(end.getMonth() + months); deadline = dateStr(end); }
     targetKg = newTarget;
-    profile = { age: isFinite(age) ? age : 0, sex: $('pSex').value, act: Number($('pAct').value) || 0, weeks: weeks, deadline: deadline };
+    profile = { age: isFinite(age) ? age : 0, sex: $('pSex').value, act: Number($('pAct').value) || 0, months: months, deadline: deadline };
     save('targetKg', targetKg);
     save('height', heightCm);
     save('profile', profile);
