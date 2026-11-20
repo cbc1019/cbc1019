@@ -511,7 +511,7 @@
     </div>
 
     <div class="hero">
-      <div class="hero-num" id="dTotal">0<small>kcal · 섭취 − 운동</small></div>
+      <div class="hero-num" id="dTotal">0<small>kcal</small></div>
       <div class="note" id="dGoalLine"></div>
     </div>
     <div class="meter" id="dMeter" hidden><div id="dMeterFill"></div></div>
@@ -519,7 +519,7 @@
 
     <div class="card">
       <div class="card-top">
-        <div class="card-title">7일 칼로리 (섭취 − 운동)</div>
+        <div class="card-title">7일 칼로리</div>
         <div class="legend" id="dLegend">
           <span><i style="background:var(--ok)"></i>목표 이내</span>
           <span><i style="background:var(--over)"></i>목표 초과</span>
@@ -1119,7 +1119,7 @@
     var total = items.reduce(function (a, it) { return a + it.k; }, 0);
     // 큰 숫자는 섭취에서 운동 소모를 뺀 값이고, 목표와의 비교·그래프도 이 값으로 한다.
     var burn = dayBurn(dietDate), net = total - burn, any = total > 0 || burn > 0;
-    $('dTotal').innerHTML = snum(net) + '<small>kcal · 섭취 − 운동</small>';
+    $('dTotal').innerHTML = snum(net) + '<small>kcal</small>';
 
     var gi = goalInfo(), goal = gi ? gi.kcal : 0;
     if (goal) {
