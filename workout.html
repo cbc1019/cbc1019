@@ -511,7 +511,7 @@
     </div>
 
     <div class="hero">
-      <div class="hero-num" id="dTotal">0<small>kcal 섭취</small></div>
+      <div class="hero-num" id="dTotal">0<small>kcal · 섭취 − 운동</small></div>
       <div class="note" id="dGoalLine"></div>
     </div>
     <div class="meter" id="dMeter" hidden><div id="dMeterFill"></div></div>
@@ -519,7 +519,7 @@
 
     <div class="card">
       <div class="card-top">
-        <div class="card-title">7일 섭취 열량</div>
+        <div class="card-title">7일 열량 (섭취 − 운동)</div>
         <div class="legend" id="dLegend">
           <span><i style="background:var(--ok)"></i>목표 이내</span>
           <span><i style="background:var(--over)"></i>목표 초과</span>
@@ -1041,6 +1041,9 @@
       full: full, missing: missing, plan: plan, expired: expired, realDays: realDays };
   }
   function dayTotal(d) { return (meals[d] || []).reduce(function (a, it) { return a + it.k; }, 0); }
+  function dayBurn(d) { return log.reduce(function (a, r) { return a + (dateStr(new Date(r.at)) === d ? (r.kcal || 0) : 0); }, 0); }
+  // 음수도 읽기 좋게: −1,080
+  function snum(n) { n = Math.round(n); return (n < 0 ? '−' : '') + num(Math.abs(n)); }
 
   var dietBars = [];
   var recentFoods = [];
@@ -1048,35 +1051,37 @@
     var box = $('dChart'), today = dateStr(new Date());
     var end = dietDate < shiftDate(today, -6) ? dietDate : today;
     var days = [];
-    for (var i = 6; i >= 0; i--) { var d = shiftDate(end, -i); days.push({ d: d, k: dayTotal(d) }); }
+    for (var i = 6; i >= 0; i--) { var d = shiftDate(end, -i); var eat = dayTotal(d), burn = dayBurn(d); days.push({ d: d, eat: eat, burn: burn, any: eat > 0 || burn > 0, k: eat - burn }); }
     var W = box.clientWidth || 320, H = 190, L = 8, R = 8, T = 30, B = 26;
     var top = Math.max(goal || 0, Math.max.apply(null, days.map(function (x) { return x.k; })), 100) * 1.12;
     var Y = function (k) { return T + (1 - k / top) * (H - T - B); };
     var slot = (W - L - R) / 7, bw = Math.min(30, slot * 0.56);
-    var h = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="최근 7일 섭취 열량 막대 그래프. 아래 요약에 같은 내용이 있습니다.">' +
+    var h = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="최근 7일 섭취에서 운동 소모를 뺀 열량 막대 그래프. 아래 요약에 같은 내용이 있습니다.">' +
       '<line class="grid-line" x1="' + L + '" x2="' + (W - R) + '" y1="' + (H - B) + '" y2="' + (H - B) + '"></line>';
     var labels = '';
     dietBars = days.map(function (x, i) {
-      var cx = L + slot * (i + 0.5), y = Y(x.k), bh = H - B - y;
+      var cx = L + slot * (i + 0.5), y = Y(Math.max(0, x.k)), bh = H - B - y;
       var cls = !goal ? 'plain' : x.k > goal ? 'over' : 'ok';
       if (x.k > 0) {
         var r = Math.min(4, bh);
         h += '<path class="bar ' + cls + '" d="M' + (cx - bw / 2) + ' ' + (H - B) + ' V' + (y + r) + ' Q' + (cx - bw / 2) + ' ' + y + ' ' + (cx - bw / 2 + r) + ' ' + y +
           ' H' + (cx + bw / 2 - r) + ' Q' + (cx + bw / 2) + ' ' + y + ' ' + (cx + bw / 2) + ' ' + (y + r) + ' V' + (H - B) + ' Z"></path>';
-        labels += '<text x="' + cx + '" y="' + (y - 5) + '" text-anchor="middle">' + num(x.k) + '</text>';
+      }
+      if (x.any) {
+        labels += '<text x="' + cx + '" y="' + (y - 5) + '" text-anchor="middle">' + snum(x.k) + '</text>';
       }
       var p = x.d.split('-');
       h += '<text' + (x.d === dietDate ? ' class="sel"' : '') + ' x="' + cx + '" y="' + (H - 8) + '" text-anchor="middle">' + (x.d === today ? '오늘' : +p[1] + '/' + +p[2]) + '</text>';
-      return { x0: cx - slot / 2, x1: cx + slot / 2, cx: cx, d: x.d, k: x.k };
+      return { x0: cx - slot / 2, x1: cx + slot / 2, cx: cx, d: x.d, k: x.k, eat: x.eat, burn: x.burn, any: x.any };
     });
     if (goal) h += '<line class="goal-line" x1="' + L + '" x2="' + (W - R) + '" y1="' + Y(goal) + '" y2="' + Y(goal) + '"></line>';
     box.innerHTML = h + labels + '</svg><div class="tip" id="dTip" hidden></div>';
 
     $('dLegend').hidden = !goal;
     if (goal) $('dGoalKey').textContent = '목표 ' + num(goal);
-    var logged = days.filter(function (x) { return x.k > 0; });
+    var logged = days.filter(function (x) { return x.any; });
     if (!goal) $('dWeekLine').textContent = '설정 탭에서 목표 체중을 저장하면 날마다 목표 이내인지 초과인지 색으로 보여 줍니다.';
-    else if (!logged.length) $('dWeekLine').textContent = '이 7일 동안 기록한 식단이 없습니다.';
+    else if (!logged.length) $('dWeekLine').textContent = '이 7일 동안 기록한 식단이나 운동이 없습니다.';
     else {
       var over = logged.filter(function (x) { return x.k > goal; }).length;
       $('dWeekLine').textContent = '기록한 ' + logged.length + '일 중 목표 이내 ' + (logged.length - over) + '일 · 초과 ' + over + '일';
@@ -1089,8 +1094,9 @@
   $('dChart').addEventListener('pointermove', function (ev) {
     var b = dietBarAt(ev), tip = $('dTip'); if (!b || !tip) return;
     var g = goalInfo(), p = b.d.split('-');
-    tip.textContent = +p[1] + '/' + +p[2] + ' · ' + (b.k ? num(b.k) + 'kcal' : '기록 없음') +
-      (g && b.k ? (b.k > g.kcal ? ' · ' + num(b.k - g.kcal) + ' 초과' : ' · 목표 이내') : '');
+    tip.textContent = +p[1] + '/' + +p[2] + ' · ' + (!b.any ? '기록 없음' :
+      (b.burn ? '섭취 ' + num(b.eat) + ' − 운동 ' + num(b.burn) + ' = ' : '') + snum(b.k) + 'kcal' +
+      (g ? (b.k > g.kcal ? ' · ' + num(b.k - g.kcal) + ' 초과' : ' · 목표 이내') : ''));
     tip.hidden = false;
     tip.style.left = Math.max(0, Math.min($('dChart').clientWidth - tip.offsetWidth, b.cx - tip.offsetWidth / 2)) + 'px';
   });
@@ -1111,25 +1117,26 @@
 
     var items = meals[dietDate] || [];
     var total = items.reduce(function (a, it) { return a + it.k; }, 0);
-    $('dTotal').innerHTML = num(total) + '<small>kcal 섭취</small>';
+    // 큰 숫자는 섭취에서 운동 소모를 뺀 값이고, 목표와의 비교·그래프도 이 값으로 한다.
+    var burn = dayBurn(dietDate), net = total - burn, any = total > 0 || burn > 0;
+    $('dTotal').innerHTML = snum(net) + '<small>kcal · 섭취 − 운동</small>';
 
     var gi = goalInfo(), goal = gi ? gi.kcal : 0;
     if (goal) {
-      var left = goal - total;
+      var left = goal - net;
       $('dGoalLine').textContent = '목표 ' + num(goal) + 'kcal · ' +
-        (!total ? '아직 기록이 없습니다' : left >= 0 ? '목표 이내 (' + num(left) + 'kcal 남음)' : '목표 초과 (' + num(-left) + 'kcal 넘음)');
+        (!any ? '아직 기록이 없습니다' : left >= 0 ? '목표 이내 (' + num(left) + 'kcal 남음)' : '목표 초과 (' + num(-left) + 'kcal 넘음)');
       $('dMeter').hidden = false;
       $('dMeter').className = 'meter' + (left < 0 ? ' over' : '');
-      $('dMeterFill').style.width = Math.min(100, total / goal * 100) + '%';
+      $('dMeterFill').style.width = Math.max(0, Math.min(100, net / goal * 100)) + '%';
     } else {
       $('dGoalLine').textContent = '설정 탭에서 목표 체중을 저장하면 하루 목표 열량을 정해 줍니다.';
       $('dMeter').hidden = true;
     }
     drawDietChart(goal);
 
-    var burn = log.reduce(function (a, r) { return a + (dateStr(new Date(r.at)) === dietDate ? (r.kcal || 0) : 0); }, 0);
-    $('dBurnLine').textContent = burn ? '이 날 운동으로 약 ' + num(burn) + 'kcal 소모' + (total ? ' · 섭취에서 빼면 ' + (total < burn ? '−' : '') + num(Math.abs(total - burn)) + 'kcal' : '') : '';
-    $('dBurnLine').hidden = !burn;
+    $('dBurnLine').textContent = '섭취 ' + num(total) + 'kcal − 운동 소모 ' + num(burn) + 'kcal';
+    $('dBurnLine').hidden = !any;
 
     $('dMeals').innerHTML = MEALS.map(function (m) {
       var rows = items.map(function (it, i) { return { it: it, i: i }; }).filter(function (x) { return x.it.m === m[0]; });
