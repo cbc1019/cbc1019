@@ -519,7 +519,7 @@
 
     <div class="card">
       <div class="card-top">
-        <div class="card-title">7일 열량 (섭취 − 운동)</div>
+        <div class="card-title">7일 칼로리 (섭취 − 운동)</div>
         <div class="legend" id="dLegend">
           <span><i style="background:var(--ok)"></i>목표 이내</span>
           <span><i style="background:var(--over)"></i>목표 초과</span>
@@ -540,7 +540,7 @@
           <option value="s">간식</option>
         </select>
         <input type="text" id="fName" maxlength="30" placeholder="음식" autocomplete="off" aria-label="음식 이름" required>
-        <input type="number" id="fKcal" class="kcal" inputmode="numeric" min="0" max="9999" step="1" placeholder="kcal" aria-label="열량 (kcal)" required>
+        <input type="number" id="fKcal" class="kcal" inputmode="numeric" min="0" max="9999" step="1" placeholder="kcal" aria-label="칼로리 (kcal)" required>
         <button type="submit">추가</button>
       </form>
     </div>
@@ -996,10 +996,10 @@
   }
   function num(n) { return String(Math.round(n)).replace(/\B(?=(\d{3})+$)/g, ','); }
 
-  // 하루 목표 열량.
-  // 유지 열량: 나이·성별·키·활동량이 모두 있으면 미플린-세인트 지어 공식(기초대사량 × 활동 계수), 없으면 체중 × 30kcal.
-  // 달성 기간이 있으면: 현재 유지 열량 − (남은 체중 × 7,700kcal ÷ 남은 일수). 하루 조정 폭은 1,000kcal까지.
-  // 기간이 없으면: 목표 체중의 유지 열량(현재 유지 열량에서 500kcal 이내).
+  // 하루 목표 칼로리.
+  // 유지 칼로리: 나이·성별·키·활동량이 모두 있으면 미플린-세인트 지어 공식(기초대사량 × 활동 계수), 없으면 체중 × 30kcal.
+  // 달성 기간이 있으면: 현재 유지 칼로리 − (남은 체중 × 7,700kcal ÷ 남은 일수). 하루 조정 폭은 1,000kcal까지.
+  // 기간이 없으면: 목표 체중의 유지 칼로리(현재 유지 칼로리에서 500kcal 이내).
   // 어느 쪽이든 최저선(남 1,500 · 여 1,200kcal) 아래로는 내리지 않는다.
   var KCAL_PER_KG = 7700;
   function dayMs(d) { var p = d.split('-'); return new Date(+p[0], +p[1] - 1, +p[2]).getTime(); }
@@ -1056,7 +1056,7 @@
     var top = Math.max(goal || 0, Math.max.apply(null, days.map(function (x) { return x.k; })), 100) * 1.12;
     var Y = function (k) { return T + (1 - k / top) * (H - T - B); };
     var slot = (W - L - R) / 7, bw = Math.min(30, slot * 0.56);
-    var h = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="최근 7일 섭취에서 운동 소모를 뺀 열량 막대 그래프. 아래 요약에 같은 내용이 있습니다.">' +
+    var h = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="최근 7일 섭취에서 운동 소모를 뺀 칼로리 막대 그래프. 아래 요약에 같은 내용이 있습니다.">' +
       '<line class="grid-line" x1="' + L + '" x2="' + (W - R) + '" y1="' + (H - B) + '" y2="' + (H - B) + '"></line>';
     var labels = '';
     dietBars = days.map(function (x, i) {
@@ -1130,7 +1130,7 @@
       $('dMeter').className = 'meter' + (left < 0 ? ' over' : '');
       $('dMeterFill').style.width = Math.max(0, Math.min(100, net / goal * 100)) + '%';
     } else {
-      $('dGoalLine').textContent = '설정 탭에서 목표 체중을 저장하면 하루 목표 열량을 정해 줍니다.';
+      $('dGoalLine').textContent = '설정 탭에서 목표 체중을 저장하면 하루 목표 칼로리를 정해 줍니다.';
       $('dMeter').hidden = true;
     }
     drawDietChart(goal);
@@ -1150,7 +1150,7 @@
     }).join('');
     $('dEmpty').hidden = items.length > 0;
 
-    // 이전에 입력한 음식: 최근 것부터, 이름·열량이 같은 것은 한 번만
+    // 이전에 입력한 음식: 최근 것부터, 이름·칼로리가 같은 것은 한 번만
     var seen = {};
     recentFoods = [];
     Object.keys(meals).sort().reverse().forEach(function (d) {
@@ -1176,26 +1176,26 @@
     $('pAct').value = profile.act ? String(profile.act) : '';
     $('pWeeks').value = profile.months ? String(profile.months) : '';
     var hint;
-    if (!gi) hint = '목표 체중과 내 정보를 저장하면 하루 목표 열량을 계산합니다. 현재 체중은 체중 탭에서 기록합니다.';
+    if (!gi) hint = '목표 체중과 내 정보를 저장하면 하루 목표 칼로리를 계산합니다. 현재 체중은 체중 탭에서 기록합니다.';
     else {
       var diff = gi.cur ? Math.round((targetKg - gi.cur) * 10) / 10 : 0;
       var move = Math.abs(diff).toFixed(1) + 'kg ' + (diff < 0 ? '감량' : '증량');
       var span = function (days) { return days >= 14 ? '약 ' + Math.round(days / 7) + '주' : days + '일'; };
       hint = '하루 목표 ' + num(goal) + 'kcal. ';
       if (gi.plan && diff !== 0) {
-        hint += gi.plan.deadline.replace(/-/g, '.') + '까지(' + gi.plan.daysLeft + '일 남음) ' + move + '하려면 현재 유지 열량 ' + num(gi.maint) + 'kcal에서 하루 ' +
+        hint += gi.plan.deadline.replace(/-/g, '.') + '까지(' + gi.plan.daysLeft + '일 남음) ' + move + '하려면 현재 유지 칼로리 ' + num(gi.maint) + 'kcal에서 하루 ' +
           num(gi.plan.want) + 'kcal를 ' + (diff < 0 ? '줄여야' : '늘려야') + ' 합니다. ';
-        if (gi.floored) hint += '다만 하루 ' + num(gi.floor) + 'kcal 아래로는 잡지 않아서 목표를 ' + num(goal) + 'kcal로 했고, 이 열량으로는 ' + (gi.realDays ? span(gi.realDays) + '가 걸립니다. ' : '기간 안에 닿기 어렵습니다. ');
+        if (gi.floored) hint += '다만 하루 ' + num(gi.floor) + 'kcal 아래로는 잡지 않아서 목표를 ' + num(goal) + 'kcal로 했고, 이 칼로리로는 ' + (gi.realDays ? span(gi.realDays) + '가 걸립니다. ' : '기간 안에 닿기 어렵습니다. ');
         else if (gi.capped) hint += '무리가 되지 않게 하루 조정 폭을 1,000kcal로 제한했고, 이 속도로는 ' + span(gi.realDays) + '가 걸립니다. ';
       } else {
         if (gi.expired) hint += '정해 둔 목표일이 지났습니다. 달성 기간을 다시 선택해 저장해 주세요. ';
-        else if (!profile.months) hint += '달성 기간을 정하지 않아 목표 체중 ' + fmtKg(targetKg) + 'kg을 유지하는 열량으로 잡았습니다. ';
+        else if (!profile.months) hint += '달성 기간을 정하지 않아 목표 체중 ' + fmtKg(targetKg) + 'kg을 유지하는 칼로리로 잡았습니다. ';
         if (gi.floored) hint += '너무 낮아지지 않게 하루 ' + num(gi.floor) + 'kcal를 최저선으로 잡았습니다. ';
-        else if (gi.capped) hint += '무리가 되지 않게 현재 유지 열량에서 500kcal까지만 조정했습니다. ';
-        if (gi.cur) hint += diff === 0 ? '현재 체중이 목표와 같습니다. ' : '현재 ' + fmtKg(gi.cur) + 'kg에서 ' + move + '이 목표' + (gi.realDays && !gi.expired ? '이고, 이 열량이면 ' + span(gi.realDays) + ' 걸립니다. ' : '입니다. ');
+        else if (gi.capped) hint += '무리가 되지 않게 현재 유지 칼로리에서 500kcal까지만 조정했습니다. ';
+        if (gi.cur) hint += diff === 0 ? '현재 체중이 목표와 같습니다. ' : '현재 ' + fmtKg(gi.cur) + 'kg에서 ' + move + '이 목표' + (gi.realDays && !gi.expired ? '이고, 이 칼로리면 ' + span(gi.realDays) + ' 걸립니다. ' : '입니다. ');
       }
-      if (gi.full) hint += '유지 열량은 나이·성별·키·활동량으로 계산했습니다.';
-      else hint += '유지 열량은 아직 "체중 × 30kcal" 어림값입니다. 나이·성별·활동량을 반영하려면 다음을 입력하세요: ' + gi.missing.join(', ') + '.';
+      if (gi.full) hint += '유지 칼로리는 나이·성별·키·활동량으로 계산했습니다.';
+      else hint += '유지 칼로리는 아직 "체중 × 30kcal" 어림값입니다. 나이·성별·활동량을 반영하려면 다음을 입력하세요: ' + gi.missing.join(', ') + '.';
     }
     $('gHint').textContent = hint;
   }
